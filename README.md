@@ -28,7 +28,7 @@ data/           collected runs
 ## Setup
 
 ```bash
-git clone <remote-url> multimodal-ood-detection && cd multimodal-ood-detection   
+git clone git@github.com:Shritasingh/multimodal-ood-detection.git && cd multimodal-ood-detection
 
 python3 -m venv .venv
 source .venv/bin/activate
