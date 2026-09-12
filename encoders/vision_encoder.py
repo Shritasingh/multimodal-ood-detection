@@ -1,11 +1,4 @@
 """E_Vision: DINOv2 features.
-
-Purpose (per motivating example): catch appearance-level anomalies that have
-no semantic content to hang a label on -- lens flare, blown-out exposure,
-sensor blur/noise, unusual lighting. DINOv2 is trained self-supervised on
-natural images without semantic/text supervision, so it's a proxy for "does
-this frame look visually typical", independent of whether we can name what's
-wrong with it.
 """
 from __future__ import annotations
 

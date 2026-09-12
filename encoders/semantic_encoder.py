@@ -1,17 +1,9 @@
 """E_Semantic: open-vocabulary detection -> z_LLM.
 
-Purpose (per motivating example): catch anomalies that are about *what
-something is* rather than how it looks in pixel space -- e.g. a small plastic
-bag on the road. Raw pixels/vision embeddings may barely move, but naming the
-object ("plastic bag", "crushable, not a road hazard") is exactly what lets a
-downstream LLM reason about whether it's safe.
-
-We run OWL-ViT open-vocabulary detection against a bank of candidate labels
+Runs OWL-ViT open-vocabulary detection against a bank of candidate labels
 (swap in Grounded-SAM/Detic later if needed) and return both:
-  - a fixed-size embedding (pooled CLIP-style image/text features) for the
-    numeric OOD scorer, and
-  - the actual detected {label, box, score} triples in `extras`, which is
-    the structured input an LLM would consume for recovery reasoning (Q3).
+  - a fixed-size embedding (pooled CLIP-style image/text features)
+  - the actual detected {label, box, score} triples in `extras`
 """
 from __future__ import annotations
 

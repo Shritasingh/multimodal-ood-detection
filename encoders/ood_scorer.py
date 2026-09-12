@@ -1,9 +1,6 @@
-"""Q1 (measuring OOD): a single, representation-agnostic novelty scorer.
-
-TODO: implement. Should work on any encoder's fixed-size embedding vector
-(k-NN or Mahalanobis distance on standardized embeddings, calibrated on a
-nominal embedding bank) so the same scorer applies to vision, semantic, and
-physics embeddings unchanged.
+"""
+TODO: implement simple OOD detection scoring methods for embeddings, 
+    e.g. cosine similarity, kNN etc.
 """
 from __future__ import annotations
 
@@ -14,7 +11,7 @@ import numpy as np
 
 @dataclass
 class NoveltyScorer:
-    method: str = "knn"  # "knn" or "mahalanobis"
+    method: str = "knn"  # tbd
     k: int = 5
 
     def fit(self, nominal_embeddings: np.ndarray) -> "NoveltyScorer":

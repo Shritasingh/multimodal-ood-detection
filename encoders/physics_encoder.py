@@ -1,12 +1,5 @@
 """E_Physics: ground-truth kinematic state -> x_hat.
 
-Purpose (per motivating example): catch anomalies that are temporal/dynamic
--- a vehicle cutting in, erratic braking -- where color and lighting are
-distractors and what matters is how an agent's pose/velocity evolves over the
-window. Per the MVP plan, we start from CARLA's ground-truth actor state
-(bypassing a learned tracker/state-estimator) to isolate "is this
-representation the right one" from "is my state estimator any good".
-
 Input format is decoupled from the `carla` package so this module (and its
 tests) don't need a running simulator: `sim/state_extractor.py` is
 responsible for turning `carla.Actor` snapshots into the plain dicts this
