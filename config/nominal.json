@@ -1,0 +1,8 @@
+{
+  "scenario": "nominal",
+  "run_name": "nominal_run",
+  "town": "Town01",
+  "n_ticks": 1400,
+  "n_background_vehicles": 5,
+  "n_background_walkers": 5
+}

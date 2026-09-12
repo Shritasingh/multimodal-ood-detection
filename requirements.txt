@@ -1,0 +1,12 @@
+torch
+torchvision
+transformers
+carla==0.9.16
+pillow
+numpy
+opencv-python-headless
+einops
+scikit-learn
+matplotlib
+timm
+tqdm

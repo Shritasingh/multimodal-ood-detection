@@ -1,0 +1,11 @@
+{
+  "scenario": "visual",
+  "run_name": "anomaly_visual",
+  "town": "Town01",
+  "n_ticks": 1400,
+  "corruption": "flare",
+  "onset_frame": 800,
+  "duration": 150,
+  "n_background_vehicles": 5,
+  "n_background_walkers": 5
+}
