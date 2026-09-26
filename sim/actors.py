@@ -31,6 +31,10 @@ def connect(host: str, port: int, town: str | None, fixed_delta: float, seed: in
     tm = client.get_trafficmanager()
     tm.set_synchronous_mode(True)
     tm.set_random_device_seed(seed)
+    # Seeds CARLA's own pedestrian/nav-mesh RNG -- without this,
+    # get_random_location_from_navigation() (walker spawn/goal points) is
+    # not reproducible even with everything else seeded.
+    world.set_pedestrians_seed(seed)
     return client, world, tm, settings
 
 
@@ -67,40 +71,55 @@ def spawn_ego_camera(world: "carla.World", ego: "carla.Actor", width: int, heigh
 
 
 def spawn_background_traffic(client, world, tm, n_vehicles: int, n_walkers: int, seed: int):
+    # A local Random instance, not the `random` module -- module-level
+    # random.choice()/random.random() calls draw from global interpreter
+    # state that's never seeded, so blueprint/speed choices wouldn't be
+    # reproducible even though the spawn-point shuffle below was.
+    rng = random.Random(seed)
+
     bp_lib = world.get_blueprint_library()
     spawn_points = world.get_map().get_spawn_points()
-    random.Random(seed).shuffle(spawn_points)
+    rng.shuffle(spawn_points)
 
     vehicle_bps = bp_lib.filter("vehicle.*")
     vehicle_bps = [b for b in vehicle_bps if int(b.get_attribute("number_of_wheels")) == 4]
 
+    # fill exactly n_vehicles so a blocked spawn point cannot leave one seed with fewer agents
     vehicles = []
-    for sp in spawn_points[1 : 1 + n_vehicles]:  # reserve spawn_points[0] for ego
-        bp = random.choice(vehicle_bps)
+    for sp in spawn_points[1:]:  # reserve spawn_points[0] for ego
+        if len(vehicles) >= n_vehicles:
+            break
+        bp = rng.choice(vehicle_bps)
         actor = world.try_spawn_actor(bp, sp)
         if actor is not None:
             actor.set_autopilot(True, tm.get_port())
             vehicles.append(actor)
+    if len(vehicles) < n_vehicles:
+        print(f"WARNING: only {len(vehicles)}/{n_vehicles} vehicles could be spawned")
 
     walker_bps = bp_lib.filter("walker.pedestrian.*")
     walkers = []
     controllers = []
     walker_controller_bp = bp_lib.find("controller.ai.walker")
-    for _ in range(n_walkers):
+    attempts = 0
+    while len(walkers) < n_walkers and attempts < 20 * max(n_walkers, 1):
+        attempts += 1
         loc = world.get_random_location_from_navigation()
         if loc is None:
             continue
-        bp = random.choice(walker_bps)
+        bp = rng.choice(walker_bps)
         actor = world.try_spawn_actor(bp, carla.Transform(loc))
         if actor is None:
             continue
         walkers.append(actor)
+    if len(walkers) < n_walkers:
+        print(f"WARNING: only {len(walkers)}/{n_walkers} walkers could be spawned")
     world.tick()  # walkers need to exist in the world before attaching controllers
     for w in walkers:
         controller = world.spawn_actor(walker_controller_bp, carla.Transform(), attach_to=w)
         controller.start()
         controller.go_to_location(world.get_random_location_from_navigation())
-        controller.set_max_speed(1.0 + random.random())
+        controller.set_max_speed(1.0 + rng.random())
         controllers.append(controller)
 
     return vehicles, walkers, controllers

@@ -1,5 +1,8 @@
 .venv/
 data/
+analysis/
 __pycache__/
 *.pyc
 *.egg-info/
+*.png
+*.jpg

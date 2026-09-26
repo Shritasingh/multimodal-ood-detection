@@ -1,9 +1,16 @@
 {
   "scenario": "physics",
   "run_name": "anomaly_physics",
-  "town": "Town01",
-  "n_ticks": 1400,
-  "trigger_tick": 600,
-  "n_background_vehicles": 5,
-  "n_background_walkers": 5
+  "town": "Town02",
+  "n_ticks": 1000,
+  "trigger_tick": 830,
+  "trigger_retry_ticks": 100,
+  "add_lead": true,
+  "lead_distance": 15.0,
+  "fixed_delta": 0.1,
+  "n_background_vehicles": 30,
+  "n_background_walkers": 5,
+  "camera_width": 800,
+  "camera_height": 600,
+  "seed": 0
 }

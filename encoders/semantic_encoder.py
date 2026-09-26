@@ -1,9 +1,13 @@
 """E_Semantic: open-vocabulary detection -> z_LLM.
 
 Runs OWL-ViT open-vocabulary detection against a bank of candidate labels
-(swap in Grounded-SAM/Detic later if needed) and return both:
-  - a fixed-size embedding (pooled CLIP-style image/text features)
-  - the actual detected {label, box, score} triples in `extras`
+(swap in Grounded-SAM/Detic later if needed), then discards the boxes --
+the numeric embedding is a score-weighted mean of BERT embeddings of the
+labels actually detected in a frame, not a pooled vision feature. This
+makes the embedding space directly about scene semantics ("what's in the
+frame") rather than pixel statistics, so cosine similarity compares label
+content instead of visual appearance. The detected {label, box, score}
+triples are still returned in `extras` for inspection/visualization.
 """
 from __future__ import annotations
 
@@ -12,17 +16,31 @@ from typing import Any, Sequence
 import numpy as np
 import torch
 from PIL import Image
-from transformers import OwlViTForObjectDetection, OwlViTProcessor
+from transformers import AutoModel, AutoTokenizer, OwlViTForObjectDetection, OwlViTProcessor
 
 DEFAULT_MODEL = "google/owlvit-base-patch32"
+DEFAULT_BERT_MODEL = "bert-base-uncased"
 
-# Minimal starter vocabulary for CARLA driving scenes. Expand/replace with a
-# scene-specific ontology or swap in fully open-vocab captioning later.
-DEFAULT_CANDIDATE_LABELS = [
-    "car", "pedestrian", "cyclist", "traffic cone", "traffic light",
-    "road sign", "plastic bag", "cardboard box", "debris", "pothole",
-    "animal", "fallen tree branch", "construction barrier", "tire",
+# CARLA's own CityObjectLabel semantic-segmentation taxonomy (every tag
+# except the non-visual catch-alls Any/NONE/Other/Dynamic/Static), used
+# as-is rather than trimmed to one map/pipeline, so the vocab stays valid
+# if the town or spawn config changes later.
+NOMINAL_LABELS = [
+    "road", "road line", "sidewalk", "building", "wall", "fence", "pole",
+    "traffic light", "traffic sign", "vegetation", "terrain", "sky",
+    "pedestrian", "rider", "car", "truck", "bus", "motorcycle", "bicycle",
+    "bridge", "rail track", "guard rail", "train", "water", "ground",
 ]
+
+# Objects sim/anomalies.py's NOVEL_OBJECT_BLUEPRINTS can inject (traffic
+# cone/plastic bag/cardboard box/mattress), plus other debris/hazard
+# concepts that shouldn't appear in a nominal CARLA scene.
+ANOMALY_LABELS = [
+    "traffic cone", "plastic bag", "cardboard box", "mattress", "debris",
+    "pothole", "animal", "fallen tree branch", "construction barrier", "tire",
+]
+
+DEFAULT_CANDIDATE_LABELS = NOMINAL_LABELS + ANOMALY_LABELS
 
 
 class OwlVitSemanticEncoder:
@@ -31,42 +49,88 @@ class OwlVitSemanticEncoder:
     def __init__(
         self,
         model_name: str = DEFAULT_MODEL,
+        bert_model_name: str = DEFAULT_BERT_MODEL,
         candidate_labels: Sequence[str] = DEFAULT_CANDIDATE_LABELS,
-        score_threshold: float = 0.1,
+        min_score: float = 0.025,
+        top_n: int = 5,
+        score_threshold: float | None = None,
         device: str | None = None,
     ):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.processor = OwlViTProcessor.from_pretrained(model_name)
         self.model = OwlViTForObjectDetection.from_pretrained(model_name).to(self.device).eval()
         self.candidate_labels = list(candidate_labels)
+        self.min_score = min_score
+        self.top_n = top_n
         self.score_threshold = score_threshold
+
+        self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model_name)
+        self.bert_model = AutoModel.from_pretrained(bert_model_name).to(self.device).eval()
+
+        # Label vocabulary is fixed, so embed it once rather than per frame.
+        label_embeds = self._bert_embed(self.candidate_labels)
+        self.label_embeddings = dict(zip(self.candidate_labels, label_embeds))
+        self.embedding_dim = label_embeds.shape[-1]
+        # Frames with zero detections above threshold get this embedding.
+        # A zero vector would break cosine similarity (division by a
+        # zero norm), so use the BERT embedding of an explicit "empty
+        # scene" phrase instead -- a real, normalizable direction that
+        # nominal empty-road frames should cluster around.
+        self._empty_embedding = self._bert_embed(["no objects detected"])[0]
+
+    @torch.no_grad()
+    def _bert_embed(self, texts: Sequence[str]) -> np.ndarray:
+        """Mean-pooled last-hidden-state BERT embedding for a batch of strings."""
+        inputs = self.bert_tokenizer(list(texts), return_tensors="pt", padding=True, truncation=True).to(self.device)
+        outputs = self.bert_model(**inputs)
+        mask = inputs["attention_mask"].unsqueeze(-1).float()
+        summed = (outputs.last_hidden_state * mask).sum(dim=1)
+        counts = mask.sum(dim=1).clamp(min=1)
+        return (summed / counts).detach().cpu().numpy()
+
+    def _labels_to_embedding(self, detections: list[dict]) -> np.ndarray:
+        """Score-weighted mean of the (precomputed) BERT embeddings of the
+        labels detected in one frame. Boxes are intentionally ignored."""
+        if not detections:
+            return self._empty_embedding
+        vecs = np.stack([self.label_embeddings[d["label"]] for d in detections])
+        weights = np.array([d["score"] for d in detections])
+        return np.average(vecs, axis=0, weights=weights)
 
     @torch.no_grad()
     def _detect(self, frame: Image.Image):
-        inputs = self.processor(
-            text=[self.candidate_labels], images=frame, return_tensors="pt"
-        ).to(self.device)
+        """Detections for one frame: per-box thresholding if score_threshold is set (the original behaviour), else the top_n labels reaching min_score."""
+        inputs = self.processor(text=[self.candidate_labels], images=frame, return_tensors="pt").to(self.device)
         outputs = self.model(**inputs)
+        detections = self._thresholded(outputs, frame) if self.score_threshold is not None else self._top_labels(outputs, frame)
+        return detections, self._labels_to_embedding(detections)
+
+    def _top_labels(self, outputs, frame: Image.Image) -> list[dict]:
+        """The top_n labels by best-box score that reach min_score, each with the box that scored it."""
+        best, best_box = torch.sigmoid(outputs.logits[0]).max(dim=0)
+        w, h = frame.size
+        detections = []
+        for label_idx in best.argsort(descending=True)[: self.top_n].tolist():
+            if best[label_idx] < self.min_score:
+                break
+            cx, cy, bw, bh = outputs.pred_boxes[0, best_box[label_idx]].tolist()
+            detections.append({
+                "label": self.candidate_labels[label_idx],
+                "score": float(best[label_idx]),
+                "box": [(cx - bw / 2) * w, (cy - bh / 2) * h, (cx + bw / 2) * w, (cy + bh / 2) * h],
+            })
+        return detections
+
+    def _thresholded(self, outputs, frame: Image.Image) -> list[dict]:
+        """Every box's best label with score above score_threshold."""
         target_sizes = torch.tensor([frame.size[::-1]], device=self.device)
         results = self.processor.post_process_grounded_object_detection(
             outputs=outputs, target_sizes=target_sizes, threshold=self.score_threshold
         )[0]
-        detections = [
-            {
-                "label": self.candidate_labels[label_idx],
-                "score": float(score),
-                "box": [float(x) for x in box],
-            }
-            for label_idx, score, box in zip(
-                results["labels"].tolist(), results["scores"].tolist(), results["boxes"].tolist()
-            )
+        return [
+            {"label": self.candidate_labels[i], "score": float(sc), "box": [float(x) for x in box]}
+            for i, sc, box in zip(results["labels"].tolist(), results["scores"].tolist(), results["boxes"].tolist())
         ]
-        # outputs.image_embeds is a per-patch grid (1, H, W, D), not a pooled
-        # vector -- mean-pool over the spatial grid to get a fixed-size
-        # embedding for the numeric OOD scorer.
-        patch_embeds = outputs.image_embeds.squeeze(0).detach().cpu().numpy()
-        image_embeds = patch_embeds.reshape(-1, patch_embeds.shape[-1]).mean(axis=0)
-        return detections, image_embeds
 
     def encode(self, obs_history: Sequence[Image.Image]) -> tuple[np.ndarray, dict[str, Any]]:
         """obs_history: list of PIL Images; we detect on the most recent frame

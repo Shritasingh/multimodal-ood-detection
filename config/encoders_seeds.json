@@ -1,0 +1,126 @@
+{
+  "reference_runs": [
+    {
+      "run_name": "nominal_seed01",
+      "data_path": "data/nominal_seed01",
+      "out_path": "data/nominal_seed01/embeddings"
+    },
+    {
+      "run_name": "nominal_seed02",
+      "data_path": "data/nominal_seed02",
+      "out_path": "data/nominal_seed02/embeddings"
+    },
+    {
+      "run_name": "nominal_seed03",
+      "data_path": "data/nominal_seed03",
+      "out_path": "data/nominal_seed03/embeddings"
+    },
+    {
+      "run_name": "nominal_seed04",
+      "data_path": "data/nominal_seed04",
+      "out_path": "data/nominal_seed04/embeddings"
+    },
+    {
+      "run_name": "nominal_seed05",
+      "data_path": "data/nominal_seed05",
+      "out_path": "data/nominal_seed05/embeddings"
+    },
+    {
+      "run_name": "nominal_seed06",
+      "data_path": "data/nominal_seed06",
+      "out_path": "data/nominal_seed06/embeddings"
+    },
+    {
+      "run_name": "nominal_seed07",
+      "data_path": "data/nominal_seed07",
+      "out_path": "data/nominal_seed07/embeddings"
+    },
+    {
+      "run_name": "nominal_seed08",
+      "data_path": "data/nominal_seed08",
+      "out_path": "data/nominal_seed08/embeddings"
+    },
+    {
+      "run_name": "nominal_seed09",
+      "data_path": "data/nominal_seed09",
+      "out_path": "data/nominal_seed09/embeddings"
+    },
+    {
+      "run_name": "nominal_seed10",
+      "data_path": "data/nominal_seed10",
+      "out_path": "data/nominal_seed10/embeddings"
+    }
+  ],
+  "anomaly_runs": [
+    {
+      "run_name": "anom_sem_box_s11",
+      "data_path": "data/anom_sem_box_s11",
+      "out_path": "data/anom_sem_box_s11/embeddings",
+      "onset_tick": 300,
+      "offset_tick": 600
+    },
+    {
+      "run_name": "anom_sem_cone_s11",
+      "data_path": "data/anom_sem_cone_s11",
+      "out_path": "data/anom_sem_cone_s11/embeddings",
+      "onset_tick": 300,
+      "offset_tick": 600
+    },
+    {
+      "run_name": "anom_sem_bag_s11",
+      "data_path": "data/anom_sem_bag_s11",
+      "out_path": "data/anom_sem_bag_s11/embeddings",
+      "onset_tick": 300,
+      "offset_tick": 600
+    },
+    {
+      "run_name": "anom_phys_s11",
+      "data_path": "data/anom_phys_s11",
+      "out_path": "data/anom_phys_s11/embeddings",
+      "onset_tick": 300,
+      "offset_tick": 340
+    },
+    {
+      "run_name": "anom_flare_s11",
+      "data_path": "data/anom_flare_s11",
+      "out_path": "data/anom_flare_s11/embeddings",
+      "onset_tick": 300,
+      "offset_tick": 450
+    },
+    {
+      "run_name": "anom_blur_s11",
+      "data_path": "data/anom_blur_s11",
+      "out_path": "data/anom_blur_s11/embeddings",
+      "onset_tick": 300,
+      "offset_tick": 450
+    }
+  ],
+  "encoders": [
+    "vision_patch",
+    "physics_roles",
+    "semantic"
+  ],
+  "output_stem": "anomaly_scores_seeds",
+  "semantic_encoder_params": {
+    "min_score": 0.025,
+    "top_n": 5
+  },
+  "semantic_params": {
+    "k": 1,
+    "metric": "cosine",
+    "dedupe_reference": true
+  },
+  "vision_patch_params": {
+    "k": 1,
+    "top_frac": 0.05
+  },
+  "physics_roles_params": {
+    "k": 5,
+    "metrics": [
+      "std_euclidean",
+      "mahalanobis"
+    ]
+  },
+  "plot": true,
+  "show": false
+}

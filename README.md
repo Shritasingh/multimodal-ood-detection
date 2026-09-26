@@ -20,13 +20,22 @@ data/           collected runs
 ```bash
 git clone git@github.com:Shritasingh/multimodal-ood-detection.git && cd multimodal-ood-detection
 
-python3 -m venv .venv
-source .venv/bin/activate
+conda create -n multim_ood python=3.12 -y
+conda activate multim_ood
 pip install --upgrade pip
 
-# torch needs the cu128 index for Blackwell support 
+# torch needs the cu128 index for Blackwell support
 pip install --index-url https://download.pytorch.org/whl/cu128 torch torchvision
 pip install -r requirements.txt
+```
+
+The vision and semantic encoders download public models from Hugging Face. To
+avoid unauthenticated Hub requests and receive the higher rate limit, create a
+read-only token at https://huggingface.co/settings/tokens and authenticate
+before running the encoders:
+
+```bash
+hf auth login
 ```
 
 ```bash
@@ -49,7 +58,7 @@ print('map:', c.get_world().get_map().name)
 ## Usage guide
 
 ```bash
-source .venv/bin/activate
+conda activate multim_ood
 ../carla_sim/launch_carla.sh &   # start the simulator if it's not already running
 
 # one command per scenario, via a config file (see config/*.json)
@@ -63,13 +72,30 @@ python scripts/run_sim.py --config config/physics.json --run-name physics_run_v2
 # create visual-anomaly variant from an existing nominal run, without recollecting
 python scripts/inject_appearance_corruption.py --src-run nominal_run --dst-run anomaly_blur --corruption blur --onset-frame 800 --duration 150
 
-# featurize every run with all three encoders
-for run in nominal_run anomaly_semantic anomaly_physics anomaly_visual; do
-  python scripts/run_encoders.py --run-name $run
-done
-
-# scoring: NoveltyScorer is a stub (TODO) -- not wired up yet
+# encode + score every run defined in config/encoders.json (no CLI flags --
+# edit that file to change run paths, k, metric, or which encoders run)
+python scripts/run_encoders.py   # expensive: runs DINOv2/OWL-ViT/BERT/physics over every frame,
+                                  # caches raw embeddings to each run's out_path
+python scripts/run_metrics.py    # cheap: scores the cached embeddings via kNN distance
+                                  # (cosine or Mahalanobis, per-encoder in config), writes
+                                  # anomaly_scores.csv/.png to each anomaly run's out_path.
+                                  # re-run this alone after editing k/metric -- no need to
+                                  # re-run run_encoders.py unless the encoders themselves changed
 ```
+
+### Nominal seeds, patch vision, role physics
+
+```bash
+python scripts/run_nominal_batch.py                          # nominal seeds 1-10 -> data/nominal_seedNN (needs CARLA)
+python scripts/run_encoders.py config/encoders_seeds.json    # vision_patch + physics_roles + semantic (top-n labels)
+python scripts/run_metrics.py  config/encoders_seeds.json    # scores anomaly_runs against the pooled seeds
+python scripts/run_sim.py --config config/semantic.json --seed 3 --trigger-tick 300   # anomaly replay of seed 3
+```
+
+`semantic` keeps the `top_n` labels whose best-box score reaches `min_score` (`semantic_encoder_params`, default 5 and 0.025).
+`run_sim.py` starts the prop at the first try from `--trigger-tick` where the ego is not at an intersection and no agent is
+within 10 m ahead (retrying every 10 s), and the swerve when the encoder's lead role is a background vehicle in the ego lane.
+`analysis/` holds diagnostics; `scripts/check_prop_ground.py` checks prop heights.
 
 ### CLI reference
 
@@ -77,7 +103,8 @@ done
 |---|---|---|
 | `run_sim.py` | `--config` `--scenario {nominal,semantic,physics,visual}` `--run-name` `--n-ticks` `--trigger-tick` `--town` `--corruption/--onset-frame/--duration` `--n-background-vehicles/walkers` `--camera-width/height` `--fixed-delta` `--seed` | `--config` loads a JSON file of these same flags (dashes -> underscores as keys); CLI flags override it |
 | `inject_appearance_corruption.py` | `--src-run` `--dst-run` `--corruption {flare,brightness,blur,mixed}` `--onset-frame` `--duration` `--seed` | pure post-processing, no CARLA needed; for deriving extra visual variants from a run you already collected |
-| `run_encoders.py` | `--run-name` `--history-len` `--stride` `--encoders` `--relative-range` `--dt` | `--dt` must match the collection run's `--fixed-delta` |
+| `run_encoders.py` | none -- reads `config/encoders.json` | vision/semantic are per-frame (no history window); physics uses a 2-frame window so its finite-difference features stay defined |
+| `run_metrics.py` | none -- reads `config/encoders.json` | reads the `.npz` files `run_encoders.py` wrote; `<encoder>_params.k`/`.metric` per encoder control the kNN scoring |
 
 ## Known Sim Issues
 
