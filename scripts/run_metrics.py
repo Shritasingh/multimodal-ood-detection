@@ -118,6 +118,41 @@ def score_semantic_per_frame(nominal: dict, query: dict, k: int, metric: str, in
     return list(range(n_frames)), scores
 
 
+def score_raw(query: dict) -> tuple[list[int], list[float]]:
+    """A score the encoder produced itself (qwen_judge_score: the VLM's 0-10 rating / 10)."""
+    return query["ticks"].tolist(), [float(v) for v in query["embeddings"][:, 0]]
+
+
+def hidden_features(d: dict, p: dict) -> np.ndarray:
+    """qwen_hidden: (T, D) float32 features at the configured pooling ('last_prompt' | 'answer_mean') and layer."""
+    layer = list(d["layers"][: d[p.get("pool", "last_prompt")].shape[1]]).index(p.get("layer", 18))
+    return d[p.get("pool", "last_prompt")][:, layer].astype(np.float32)
+
+
+def score_hidden(nominal: dict, query: dict, p: dict, metric: str) -> tuple[list[int], list[float]]:
+    """kNN on decoder hidden states. pca_whiten: centre on the nominal mean, project onto the top
+    n_components (at most N/10) nominal principal axes and divide by their std, so the Euclidean distance is a
+    Mahalanobis distance in the nominal subspace (raw LLM states are dominated by a few huge-activation
+    dimensions). cosine: cosine distance after centring."""
+    ref, q = hidden_features(nominal, p), hidden_features(query, p)
+    mu = ref.mean(0)
+    ref, q = ref - mu, q - mu
+    if metric == "pca_whiten":
+        _, sv, vt = np.linalg.svd(ref, full_matrices=False)
+        n = min(p.get("n_components", 64), len(ref) // 10)  # >= 10 nominal samples per whitened axis
+        w = vt[:n].T / (sv[:n] / np.sqrt(len(ref) - 1))
+        ref, q = ref @ w, q @ w
+        d = np.sqrt(((q[:, None, :] - ref[None]) ** 2).sum(-1))
+    elif metric == "cosine":
+        rn = ref / np.linalg.norm(ref, axis=1, keepdims=True)
+        qn = q / np.linalg.norm(q, axis=1, keepdims=True)
+        d = 1.0 - qn @ rn.T
+    else:
+        raise ValueError(f"unknown qwen_hidden metric: {metric!r} (expected 'pca_whiten' or 'cosine')")
+    k = min(p.get("k", 5), d.shape[1])
+    return query["ticks"].tolist(), np.partition(d, k - 1, axis=1)[:, :k].mean(1).tolist()
+
+
 def load_patch_bank(out_paths: list[str], name: str):
     """Stream every reference run's patch tokens into one L2-normalised fp16 bank (GPU if available), one run at a time."""
     import torch
@@ -188,8 +223,12 @@ def score_encoder(name, nominal, query, p, metric, inv_cov):
         return score_vision_patch(nominal, query, p.get("top_frac", 0.05), p.get("k", 1))
     if name == "physics_roles" and metric in (None, "std_euclidean"):
         return score_std_euclidean(nominal, query, p.get("k", 5))
-    if name == "semantic":
+    if name in ("semantic", "qwen_labels", "qwen_judge_labels"):
         return score_semantic_per_frame(nominal, query, p["k"], metric, inv_cov)
+    if name == "qwen_judge_score":
+        return score_raw(query)
+    if name == "qwen_hidden":
+        return score_hidden(nominal, query, p, metric)
     return score_per_frame(nominal, query, p["k"], metric, inv_cov)
 
 
@@ -255,6 +294,10 @@ def params_from_config(config: dict) -> dict:
         "physics": config.get("physics_params", {"k": 5, "metric": "mahalanobis"}),
         "vision_patch": config.get("vision_patch_params", {"k": 1, "top_frac": 0.05}),
         "physics_roles": config.get("physics_roles_params", {"k": 5, "metric": "std_euclidean"}),
+        "qwen_labels": config.get("qwen_labels_params", {"k": 1, "metric": "cosine", "dedupe_reference": True}),
+        "qwen_judge_labels": config.get("qwen_judge_labels_params", {"k": 1, "metric": "cosine", "dedupe_reference": True}),
+        "qwen_judge_score": config.get("qwen_judge_score_params", {"k": 1, "metric": "raw"}),
+        "qwen_hidden": config.get("qwen_hidden_params", {"k": 5, "metric": "pca_whiten", "layer": 18, "pool": "last_prompt", "n_components": 64}),
     }
 
 
@@ -264,8 +307,9 @@ def build_reference(ref_paths: list[str], active_encoders: list[str], params: di
         name: {"bank": load_patch_bank(ref_paths, f"{name}_nominal")} if name == "vision_patch" else load_reference(ref_paths, f"{name}_nominal")
         for name in active_encoders
     }
-    if "semantic" in nominal and params["semantic"].get("dedupe_reference"):
-        nominal["semantic"] = dedupe_by_label(nominal["semantic"])
+    for name in nominal:
+        if params[name].get("dedupe_reference") and "labels" in nominal[name]:
+            nominal[name] = dedupe_by_label(nominal[name])
     inv_cov = {
         name: fit_inv_cov(nominal[name]["embeddings"])
         for name in active_encoders

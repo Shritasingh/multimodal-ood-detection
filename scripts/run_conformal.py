@@ -69,7 +69,7 @@ def main():
     config = json.loads(Path(args.config).read_text())
     params = rm.params_from_config(config)
     stem = config.get("output_stem", "anomaly_scores")
-    cal_path = ROOT / "data" / "conformal_calibration_seeds.npz"
+    cal_path = ROOT / "data" / config.get("calibration_cache", "conformal_calibration_seeds.npz")
 
     if args.calibration_run:
         c = load_series(ROOT / "data" / args.calibration_run / "embeddings" / f"{stem}.csv")
@@ -114,7 +114,7 @@ def main():
         for k, m in res.items():
             fpr, tnr = (m["FPR_indep"], m["TNR_indep"]) if "FPR_indep" in m else (m["FPR"], m["TNR"])
             print(f"{name:20s} {k:30s} {f(m['TPR'] if m['P'] else None):>5s} {f(fpr):>5s} {f(tnr):>5s} {f(m.get('AUROC_same_ticks')):>6s} {f(m.get('AUROC_vs_neg')):>6s}")
-    out = ROOT / "data" / (f"conformal_calib_{args.calibration_run}.json" if args.calibration_run else "conformal_seeds.json")
+    out = ROOT / "data" / (f"conformal_calib_{args.calibration_run}.json" if args.calibration_run else config.get("conformal_results", "conformal_seeds.json"))
     out.write_text(json.dumps({"alpha": args.alpha, "thresholds": tau, "results": results}, indent=1))
     print(f"\nwrote {out.relative_to(ROOT)}")
 

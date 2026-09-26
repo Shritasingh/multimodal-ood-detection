@@ -25,6 +25,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = Path(sys.argv[1]) if len(sys.argv) > 1 else REPO_ROOT / "config" / "encoders.json"
 
 sys.path.insert(0, str(REPO_ROOT))
+from encoders.qwen_encoder import JUDGE_PROMPT, LABELS_PROMPT, QwenVLEncoder, TextEmbedder, parse_judge, parse_label_list
 from encoders.physics_encoder import GroundTruthPhysicsEncoder, RolePhysicsEncoder
 from encoders.semantic_encoder import OwlVitSemanticEncoder
 from encoders.vision_encoder import DinoPatchEncoder, DinoVisionEncoder
@@ -93,7 +94,59 @@ def encode_semantic(frame_paths, encoder: OwlVitSemanticEncoder, desc: str) -> t
     return np.stack(embeds), np.array(frame_idx), np.array(labels), np.array(scores)
 
 
-def encode_run(run_name: str, data_path: str, out_path: str, active_encoders: list[str], models: dict, suffix: str) -> None:
+QWEN_ENCODERS = ("qwen_labels", "qwen_hidden", "qwen_judge_labels", "qwen_judge_score")
+
+
+def label_rows(per_frame: list[tuple[int, list[str]]], embedder: TextEmbedder) -> dict:
+    """One row per (frame, label), in the same layout as semantic.npz so run_metrics scores it the same way."""
+    rows = [(t, l) for t, labels in per_frame for l in labels]
+    labels = [l for _, l in rows]
+    return {"embeddings": embedder.embed(labels), "frame_idx": np.array([t for t, _ in rows]), "labels": np.array(labels)}
+
+
+def encode_qwen(frame_paths, active: list[str], models: dict, p: dict, stride: int, out_dir: Path, suffix: str, desc: str) -> None:
+    """Every stride-th frame: a labels pass (options 1 and 3 share it; hidden states are captured during
+    that generation) and/or a judge pass (option 2). Raw model outputs go to qwen_texts<suffix>.jsonl."""
+    enc, emb = models["qwen"], models["qwen_text"]
+    ticks = list(range(0, len(frame_paths), stride))
+    bs = p.get("batch_size", 6)
+    want_labels = "qwen_labels" in active or "qwen_hidden" in active
+    want_judge = "qwen_judge_labels" in active or "qwen_judge_score" in active
+    labels, judge, scores, last, ans, log = [], [], [], [], [], []
+    for i in tqdm(range(0, len(ticks), bs), desc=desc):
+        tb = ticks[i : i + bs]
+        frames = [Image.open(frame_paths[t]).convert("RGB") for t in tb]
+        if want_labels:
+            texts, lp, am = enc.generate(frames, LABELS_PROMPT, p.get("max_new_tokens_labels", 96), hidden="qwen_hidden" in active)
+            labels += [(t, parse_label_list(x)) for t, x in zip(tb, texts)]
+            log += [{"tick": t, "prompt": "labels", "output": x} for t, x in zip(tb, texts)]
+            if lp is not None:
+                last.append(lp)
+                ans.append(am)
+        if want_judge:
+            texts, _, _ = enc.generate(frames, JUDGE_PROMPT, p.get("max_new_tokens_judge", 160))
+            for t, x in zip(tb, texts):
+                lab, sc = parse_judge(x)
+                judge.append((t, lab))
+                scores.append(sc)
+            log += [{"tick": t, "prompt": "judge", "output": x} for t, x in zip(tb, texts)]
+
+    ticks = np.array(ticks)
+    if "qwen_labels" in active:
+        np.savez(out_dir / f"qwen_labels{suffix}.npz", **label_rows(labels, emb), ticks=ticks)
+    if "qwen_hidden" in active:
+        np.savez(out_dir / f"qwen_hidden{suffix}.npz", last_prompt=np.concatenate(last), answer_mean=np.concatenate(ans),
+                 layers=np.array(enc.layers), ticks=ticks)
+    if "qwen_judge_labels" in active:
+        np.savez(out_dir / f"qwen_judge_labels{suffix}.npz", **label_rows(judge, emb), ticks=ticks)
+    if "qwen_judge_score" in active:
+        np.savez(out_dir / f"qwen_judge_score{suffix}.npz", embeddings=np.array(scores)[:, None], ticks=ticks)
+    with open(out_dir / f"qwen_texts{suffix}.jsonl", "w") as f:
+        f.writelines(json.dumps(r) + "\n" for r in log)
+    print(f"  qwen{suffix}: {len(ticks)} frames (stride {stride}) -> {out_dir}")
+
+
+def encode_run(run_name: str, data_path: str, out_path: str, active_encoders: list[str], models: dict, suffix: str, qwen_params: dict | None = None) -> None:
     """suffix: '_nominal' for the reference run's feature pool, '' for an
     anomaly run's own raw embeddings."""
     print(f"=== {run_name} ===")
@@ -125,6 +178,12 @@ def encode_run(run_name: str, data_path: str, out_path: str, active_encoders: li
         np.savez(out_file, embeddings=embeddings, ticks=ticks)
         print(f"  physics{suffix}: {embeddings.shape} -> {out_file}")
 
+    qwen_active = [e for e in active_encoders if e in QWEN_ENCODERS]
+    if qwen_active:
+        p = qwen_params or {}
+        stride = p.get("stride_reference", 10) if suffix == "_nominal" else p.get("stride_eval", 5)
+        encode_qwen(frame_paths, qwen_active, models, p, stride, out_dir, suffix, f"{run_name}/qwen")
+
     if "semantic" in active_encoders:
         embeddings, frame_idx, labels, scores = encode_semantic(frame_paths, models["semantic"], f"{run_name}/semantic")
         out_file = out_dir / f"semantic{suffix}.npz"
@@ -147,13 +206,17 @@ def main():
         models["semantic"] = OwlVitSemanticEncoder(**config.get("semantic_encoder_params", {}))
     if "physics" in active_encoders:
         models["physics"] = GroundTruthPhysicsEncoder()
+    qwen_params = config.get("qwen_encoder_params", {})
+    if any(e in QWEN_ENCODERS for e in active_encoders):
+        models["qwen"] = QwenVLEncoder(**{k: qwen_params[k] for k in ("model_name", "layers") if k in qwen_params})
+        models["qwen_text"] = TextEmbedder()
 
     if "--anomaly-only" not in sys.argv:
         for ref in config.get("reference_runs") or [config["reference_run"]]:
-            encode_run(ref["run_name"], ref["data_path"], ref["out_path"], active_encoders, models, suffix="_nominal")
+            encode_run(ref["run_name"], ref["data_path"], ref["out_path"], active_encoders, models, suffix="_nominal", qwen_params=qwen_params)
 
     for run in config["anomaly_runs"]:
-        encode_run(run["run_name"], run["data_path"], run["out_path"], active_encoders, models, suffix="")
+        encode_run(run["run_name"], run["data_path"], run["out_path"], active_encoders, models, suffix="", qwen_params=qwen_params)
 
 
 if __name__ == "__main__":
