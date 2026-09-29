@@ -1,116 +1,31 @@
 {
-  "reference_runs": [
-    {
-      "run_name": "nominal_seed01",
-      "data_path": "data/nominal_seed01",
-      "out_path": "data/nominal_seed01/embeddings"
+  "data": "config/data.json",
+  "encoders": {
+    "qwen_labels": {
+      "k": 1,
+      "metric": "cosine",
+      "dedupe_reference": true
     },
-    {
-      "run_name": "nominal_seed02",
-      "data_path": "data/nominal_seed02",
-      "out_path": "data/nominal_seed02/embeddings"
+    "qwen_hidden": {
+      "k": 5,
+      "metrics": [
+        "pca_whiten",
+        "cosine"
+      ],
+      "layer": 18,
+      "pool": "last_prompt",
+      "n_components": 64
     },
-    {
-      "run_name": "nominal_seed03",
-      "data_path": "data/nominal_seed03",
-      "out_path": "data/nominal_seed03/embeddings"
+    "qwen_judge_labels": {
+      "k": 1,
+      "metric": "cosine",
+      "dedupe_reference": true
     },
-    {
-      "run_name": "nominal_seed04",
-      "data_path": "data/nominal_seed04",
-      "out_path": "data/nominal_seed04/embeddings"
-    },
-    {
-      "run_name": "nominal_seed05",
-      "data_path": "data/nominal_seed05",
-      "out_path": "data/nominal_seed05/embeddings"
-    },
-    {
-      "run_name": "nominal_seed06",
-      "data_path": "data/nominal_seed06",
-      "out_path": "data/nominal_seed06/embeddings"
-    },
-    {
-      "run_name": "nominal_seed07",
-      "data_path": "data/nominal_seed07",
-      "out_path": "data/nominal_seed07/embeddings"
-    },
-    {
-      "run_name": "nominal_seed08",
-      "data_path": "data/nominal_seed08",
-      "out_path": "data/nominal_seed08/embeddings"
-    },
-    {
-      "run_name": "nominal_seed09",
-      "data_path": "data/nominal_seed09",
-      "out_path": "data/nominal_seed09/embeddings"
-    },
-    {
-      "run_name": "nominal_seed10",
-      "data_path": "data/nominal_seed10",
-      "out_path": "data/nominal_seed10/embeddings"
+    "qwen_judge_score": {
+      "k": 1,
+      "metric": "raw"
     }
-  ],
-  "anomaly_runs": [
-    {
-      "run_name": "anom_sem_box_s11",
-      "data_path": "data/anom_sem_box_s11",
-      "out_path": "data/anom_sem_box_s11/embeddings",
-      "onset_tick": 300,
-      "offset_tick": 600
-    },
-    {
-      "run_name": "anom_sem_cone_s11",
-      "data_path": "data/anom_sem_cone_s11",
-      "out_path": "data/anom_sem_cone_s11/embeddings",
-      "onset_tick": 300,
-      "offset_tick": 600
-    },
-    {
-      "run_name": "anom_sem_bag_s11",
-      "data_path": "data/anom_sem_bag_s11",
-      "out_path": "data/anom_sem_bag_s11/embeddings",
-      "onset_tick": 300,
-      "offset_tick": 600
-    },
-    {
-      "run_name": "anom_phys_s11",
-      "data_path": "data/anom_phys_s11",
-      "out_path": "data/anom_phys_s11/embeddings",
-      "onset_tick": 300,
-      "offset_tick": 340
-    },
-    {
-      "run_name": "anom_flare_s11",
-      "data_path": "data/anom_flare_s11",
-      "out_path": "data/anom_flare_s11/embeddings",
-      "onset_tick": 300,
-      "offset_tick": 450
-    },
-    {
-      "run_name": "anom_blur_s11",
-      "data_path": "data/anom_blur_s11",
-      "out_path": "data/anom_blur_s11/embeddings",
-      "onset_tick": 300,
-      "offset_tick": 450
-    },
-    {
-      "run_name": "nominal_seed11",
-      "data_path": "data/nominal_seed11",
-      "out_path": "data/nominal_seed11/embeddings",
-      "onset_tick": 600,
-      "offset_tick": 600
-    }
-  ],
-  "encoders": [
-    "qwen_labels",
-    "qwen_hidden",
-    "qwen_judge_labels",
-    "qwen_judge_score"
-  ],
-  "output_stem": "anomaly_scores_qwen",
-  "calibration_cache": "conformal_calibration_qwen.npz",
-  "conformal_results": "conformal_qwen.json",
+  },
   "qwen_encoder_params": {
     "layers": [
       9,
@@ -122,31 +37,20 @@
     "stride_reference": 10,
     "stride_eval": 5,
     "max_new_tokens_labels": 96,
-    "max_new_tokens_judge": 160
+    "max_new_tokens_judge": 160,
+    "reuse_texts": false
   },
-  "qwen_labels_params": {
-    "k": 1,
-    "metric": "cosine",
-    "dedupe_reference": true
+  "text_embedding": {
+    "embedders": [
+      "minilm"
+    ]
   },
-  "qwen_judge_labels_params": {
-    "k": 1,
-    "metric": "cosine",
-    "dedupe_reference": true
-  },
-  "qwen_judge_score_params": {
-    "k": 1,
-    "metric": "raw"
-  },
-  "qwen_hidden_params": {
-    "k": 5,
-    "metrics": [
-      "pca_whiten",
-      "cosine"
-    ],
-    "layer": 18,
-    "pool": "last_prompt",
-    "n_components": 64
+  "output_stem": "anomaly_scores_qwen",
+  "calibration_cache": "conformal_calibration_qwen.npz",
+  "conformal_results": "conformal_qwen.json",
+  "conformal": {
+    "alpha_trans": 0.05,
+    "alpha_cal": 0.1
   },
   "plot": true,
   "show": false

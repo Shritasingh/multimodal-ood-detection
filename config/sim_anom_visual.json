@@ -1,15 +1,15 @@
 {
   "scenario": "visual",
-  "run_name": "anomaly_visual",
+  "run_name": "anom_{corruption}_s{seed}",
   "town": "Town02",
-  "n_ticks": 1000,
+  "n_ticks": 600,
   "corruption": "flare",
-  "onset_frame": 830,
+  "onset_frame": 300,
   "duration": 150,
   "fixed_delta": 0.1,
   "n_background_vehicles": 30,
   "n_background_walkers": 5,
   "camera_width": 800,
   "camera_height": 600,
-  "seed": 0
+  "seed": 11
 }

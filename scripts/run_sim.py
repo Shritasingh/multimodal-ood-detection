@@ -6,14 +6,15 @@ Usage (flags):
     .venv/bin/python scripts/run_sim.py --run-name anomaly_semantic \
         --scenario semantic --trigger-tick 600 --n-ticks 1200
 
-Usage (config file -- see config/*.json for one per scenario):
-    .venv/bin/python scripts/run_sim.py --config config/physics.json
+Usage (config file -- see config/sim_*.json for one per scenario):
+    .venv/bin/python scripts/run_sim.py --config config/sim_anom_physics.json --seed 11   # -> data/anom_phys_s11
 
     # flags still override individual values from the config file:
-    .venv/bin/python scripts/run_sim.py --config config/physics.json --run-name my_run_v2
+    .venv/bin/python scripts/run_sim.py --config config/sim_anom_physics.json --run-name my_run_v2
 
 Config file keys match the flag names with dashes replaced by underscores
-(e.g. --run-name -> "run_name", --n-ticks -> "n_ticks").
+(e.g. --run-name -> "run_name", --n-ticks -> "n_ticks"). run_name may reference other
+args as a format template, e.g. "nominal_seed{seed:02d}".
 """
 from __future__ import annotations
 
@@ -106,6 +107,8 @@ def parse_args():
     args = p.parse_args()
     if not args.run_name:
         p.error("--run-name is required (via CLI or config file)")
+    # run names may use any arg as a template, e.g. "nominal_seed{seed:02d}" or "anom_{corruption}_s{seed}"
+    args.run_name = args.run_name.format(**vars(args))
     return args
 
 

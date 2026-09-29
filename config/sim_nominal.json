@@ -1,6 +1,6 @@
 {
   "scenario": "nominal",
-  "run_name": "nominal_run",
+  "run_name": "nominal_seed{seed:02d}",
   "town": "Town02",
   "n_ticks": 1000,
   "fixed_delta": 0.1,
@@ -8,5 +8,5 @@
   "n_background_walkers": 5,
   "camera_width": 800,
   "camera_height": 600,
-  "seed": 0
+  "seed": 1
 }

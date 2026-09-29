@@ -1,0 +1,56 @@
+{
+  "reference_run": {
+    "run_name": "nominal_run",
+    "data_path": "data/nominal_run",
+    "out_path": "data/nominal_run/embeddings"
+  },
+  "anomaly_runs": [
+    {
+      "run_name": "anomaly_visual",
+      "data_path": "data/anomaly_visual",
+      "out_path": "data/anomaly_visual/embeddings",
+      "onset_tick": 830,
+      "offset_tick": 980
+    },
+    {
+      "run_name": "anomaly_semantic",
+      "data_path": "data/anomaly_semantic",
+      "out_path": "data/anomaly_semantic/embeddings",
+      "onset_tick": 830,
+      "offset_tick": 1000
+    },
+    {
+      "run_name": "anomaly_physics",
+      "data_path": "data/anomaly_physics",
+      "out_path": "data/anomaly_physics/embeddings",
+      "onset_tick": 830,
+      "offset_tick": 870
+    },
+    {
+      "run_name": "anomaly_visual_blur",
+      "data_path": "data/anomaly_visual_blur",
+      "out_path": "data/anomaly_visual_blur/embeddings",
+      "onset_tick": 830,
+      "offset_tick": 980
+    }
+  ],
+  "encoders": [
+    "vision",
+    "semantic",
+    "physics"
+  ],
+  "vision_params": {
+    "k": 5,
+    "metric": "cosine"
+  },
+  "semantic_params": {
+    "k": 5,
+    "metric": "cosine"
+  },
+  "physics_params": {
+    "k": 5,
+    "metric": "mahalanobis"
+  },
+  "plot": true,
+  "show": false
+}

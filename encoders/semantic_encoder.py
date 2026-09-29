@@ -2,8 +2,9 @@
 
 Runs OWL-ViT open-vocabulary detection against a bank of candidate labels
 (swap in Grounded-SAM/Detic later if needed), then discards the boxes --
-the numeric embedding is a score-weighted mean of BERT embeddings of the
-labels actually detected in a frame, not a pooled vision feature. This
+the numeric embedding is a score-weighted mean of text embeddings of the
+labels actually detected in a frame (BERT by default; any preset from
+encoders/text_embedder.py via text_embedder=...), not a pooled vision feature. This
 makes the embedding space directly about scene semantics ("what's in the
 frame") rather than pixel statistics, so cosine similarity compares label
 content instead of visual appearance. The detected {label, box, score}
@@ -16,10 +17,12 @@ from typing import Any, Sequence
 import numpy as np
 import torch
 from PIL import Image
-from transformers import AutoModel, AutoTokenizer, OwlViTForObjectDetection, OwlViTProcessor
+from transformers import OwlViTForObjectDetection, OwlViTProcessor
+
+from encoders.text_embedder import TextEmbedder
 
 DEFAULT_MODEL = "google/owlvit-base-patch32"
-DEFAULT_BERT_MODEL = "bert-base-uncased"
+DEFAULT_TEXT_EMBEDDER = "bert"  # the original embedder; kept as default so existing results stay comparable
 
 # CARLA's own CityObjectLabel semantic-segmentation taxonomy (every tag
 # except the non-visual catch-alls Any/NONE/Other/Dynamic/Static), used
@@ -49,7 +52,8 @@ class OwlVitSemanticEncoder:
     def __init__(
         self,
         model_name: str = DEFAULT_MODEL,
-        bert_model_name: str = DEFAULT_BERT_MODEL,
+        text_embedder: str | TextEmbedder = DEFAULT_TEXT_EMBEDDER,
+        text_presets: dict | None = None,
         candidate_labels: Sequence[str] = DEFAULT_CANDIDATE_LABELS,
         min_score: float = 0.025,
         top_n: int = 5,
@@ -64,32 +68,22 @@ class OwlVitSemanticEncoder:
         self.top_n = top_n
         self.score_threshold = score_threshold
 
-        self.bert_tokenizer = AutoTokenizer.from_pretrained(bert_model_name)
-        self.bert_model = AutoModel.from_pretrained(bert_model_name).to(self.device).eval()
+        # a preset name (bert / minilm / clip / text_presets entry) or an already-loaded embedder to share
+        self.text = text_embedder if isinstance(text_embedder, TextEmbedder) else TextEmbedder.from_preset(text_embedder, text_presets, device=self.device)
 
         # Label vocabulary is fixed, so embed it once rather than per frame.
-        label_embeds = self._bert_embed(self.candidate_labels)
+        label_embeds = self.text.embed(self.candidate_labels)
         self.label_embeddings = dict(zip(self.candidate_labels, label_embeds))
         self.embedding_dim = label_embeds.shape[-1]
         # Frames with zero detections above threshold get this embedding.
         # A zero vector would break cosine similarity (division by a
-        # zero norm), so use the BERT embedding of an explicit "empty
+        # zero norm), so use the text embedding of an explicit "empty
         # scene" phrase instead -- a real, normalizable direction that
         # nominal empty-road frames should cluster around.
-        self._empty_embedding = self._bert_embed(["no objects detected"])[0]
-
-    @torch.no_grad()
-    def _bert_embed(self, texts: Sequence[str]) -> np.ndarray:
-        """Mean-pooled last-hidden-state BERT embedding for a batch of strings."""
-        inputs = self.bert_tokenizer(list(texts), return_tensors="pt", padding=True, truncation=True).to(self.device)
-        outputs = self.bert_model(**inputs)
-        mask = inputs["attention_mask"].unsqueeze(-1).float()
-        summed = (outputs.last_hidden_state * mask).sum(dim=1)
-        counts = mask.sum(dim=1).clamp(min=1)
-        return (summed / counts).detach().cpu().numpy()
+        self._empty_embedding = self.text.embed(["no objects detected"])[0]
 
     def _labels_to_embedding(self, detections: list[dict]) -> np.ndarray:
-        """Score-weighted mean of the (precomputed) BERT embeddings of the
+        """Score-weighted mean of the (precomputed) text embeddings of the
         labels detected in one frame. Boxes are intentionally ignored."""
         if not detections:
             return self._empty_embedding
@@ -98,10 +92,21 @@ class OwlVitSemanticEncoder:
         return np.average(vecs, axis=0, weights=weights)
 
     @torch.no_grad()
-    def _detect(self, frame: Image.Image):
-        """Detections for one frame: per-box thresholding if score_threshold is set (the original behaviour), else the top_n labels reaching min_score."""
+    def _forward(self, frame: Image.Image):
         inputs = self.processor(text=[self.candidate_labels], images=frame, return_tensors="pt").to(self.device)
-        outputs = self.model(**inputs)
+        return self.model(**inputs)
+
+    @torch.no_grad()
+    def label_scores(self, frame: Image.Image | None = None, outputs=None) -> np.ndarray:
+        """Best-box sigmoid score for every candidate label, with no top_n / min_score cut: the frame's
+        raw per-label evidence, normalised into a distribution over labels by the semantic_dist scorer."""
+        outputs = outputs if outputs is not None else self._forward(frame)
+        return torch.sigmoid(outputs.logits[0]).max(dim=0).values.float().cpu().numpy()
+
+    @torch.no_grad()
+    def _detect(self, frame: Image.Image, outputs=None):
+        """Detections for one frame: per-box thresholding if score_threshold is set (the original behaviour), else the top_n labels reaching min_score."""
+        outputs = outputs if outputs is not None else self._forward(frame)
         detections = self._thresholded(outputs, frame) if self.score_threshold is not None else self._top_labels(outputs, frame)
         return detections, self._labels_to_embedding(detections)
 

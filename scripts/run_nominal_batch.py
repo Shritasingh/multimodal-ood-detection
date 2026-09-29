@@ -44,7 +44,7 @@ def check_run(name: str, cfg: dict) -> str:
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--seeds", default="1-10", help="e.g. 1-10 or 1-3,7")
-    p.add_argument("--config", type=Path, default=REPO_ROOT / "config" / "nominal.json")
+    p.add_argument("--config", type=Path, default=REPO_ROOT / "config" / "sim_nominal.json")
     p.add_argument("--prefix", default="nominal_seed")
     p.add_argument("--overwrite", action="store_true")
     args = p.parse_args()

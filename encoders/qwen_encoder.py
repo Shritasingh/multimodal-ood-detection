@@ -1,8 +1,8 @@
 """E_Qwen: Qwen3-VL as a semantic encoder, three ways.
 
 1. qwen_labels -- the model lists the object categories in a frame (open
-   vocabulary, no candidate label set); each label is embedded with a
-   sentence encoder and scored by cosine distance to the nearest label Qwen
+   vocabulary, no candidate label set); each label is embedded with a text
+   embedder (encoders/text_embedder.py) and scored by cosine distance to the nearest label Qwen
    produced on the nominal runs.
 2. qwen_judge_labels / qwen_judge_score -- one JSON prompt returns both an
    object list (scored like 1) and the model's own 0-10 anomaly score.
@@ -21,11 +21,11 @@ from typing import Sequence
 import numpy as np
 import torch
 from PIL import Image
-from transformers import AutoModel, AutoModelForImageTextToText, AutoProcessor, AutoTokenizer
+from transformers import AutoModelForImageTextToText, AutoProcessor
+
+from encoders.text_embedder import TEXT_EMBEDDERS, TextEmbedder  # noqa: F401  (re-exported for callers)
 
 DEFAULT_MODEL = "Qwen/Qwen3-VL-4B-Instruct"
-DEFAULT_TEXT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-
 LABELS_PROMPT = (
     "List every distinct object category visible in this driving scene, "
     "as a comma-separated list of short noun phrases. No other text."
@@ -47,7 +47,7 @@ def clean_labels(items: Sequence[str]) -> list[str]:
     """Lower-cased, stripped, de-duplicated labels in first-seen order, dropping empties and run-on phrases."""
     out: list[str] = []
     for x in items:
-        x = re.sub(r"[^a-z0-9 \-]", "", str(x).lower()).strip()
+        x = re.sub(r"[^a-z0-9 \-]", "", str(x).lower().replace("_", " ")).strip()  # "picket_fence" -> "picket fence"
         if x and len(x.split()) <= MAX_LABEL_WORDS and x not in out:
             out.append(x)
     return out[:MAX_LABELS]
@@ -67,27 +67,6 @@ def parse_judge(text: str) -> tuple[list[str], float]:
     labels = clean_labels(list(j.get("objects") or []) + list(j.get("unusual_objects") or []))
     score = j.get("anomaly_score")
     return labels, float(score) / 10 if isinstance(score, (int, float)) else float("nan")
-
-
-class TextEmbedder:
-    """Mean-pooled, L2-normalised sentence embeddings (MiniLM: 384-d), cached per string."""
-
-    def __init__(self, model_name: str = DEFAULT_TEXT_MODEL, device: str | None = None):
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModel.from_pretrained(model_name).to(self.device).eval()
-        self.cache: dict[str, np.ndarray] = {}
-
-    @torch.no_grad()
-    def embed(self, texts: Sequence[str]) -> np.ndarray:
-        new = [t for t in dict.fromkeys(texts) if t not in self.cache]
-        if new:
-            inp = self.tokenizer(new, return_tensors="pt", padding=True, truncation=True).to(self.device)
-            h = self.model(**inp).last_hidden_state
-            mask = inp["attention_mask"].unsqueeze(-1).float()
-            v = torch.nn.functional.normalize((h * mask).sum(1) / mask.sum(1).clamp(min=1), dim=-1)
-            self.cache.update(zip(new, v.float().cpu().numpy()))
-        return np.stack([self.cache[t] for t in texts]) if texts else np.zeros((0, 384), np.float32)
 
 
 class QwenVLEncoder:

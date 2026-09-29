@@ -1,9 +1,9 @@
 {
   "scenario": "physics",
-  "run_name": "anomaly_physics",
+  "run_name": "anom_phys_s{seed}",
   "town": "Town02",
-  "n_ticks": 1000,
-  "trigger_tick": 830,
+  "n_ticks": 600,
+  "trigger_tick": 300,
   "trigger_retry_ticks": 100,
   "add_lead": true,
   "lead_distance": 15.0,
@@ -12,5 +12,5 @@
   "n_background_walkers": 5,
   "camera_width": 800,
   "camera_height": 600,
-  "seed": 0
+  "seed": 11
 }

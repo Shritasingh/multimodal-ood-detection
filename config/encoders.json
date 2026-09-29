@@ -1,55 +1,55 @@
 {
-  "reference_run": {
-    "run_name": "nominal_run",
-    "data_path": "data/nominal_run",
-    "out_path": "data/nominal_run/embeddings"
-  },
-  "anomaly_runs": [
-    {
-      "run_name": "anomaly_visual",
-      "data_path": "data/anomaly_visual",
-      "out_path": "data/anomaly_visual/embeddings",
-      "onset_tick": 830,
-      "offset_tick": 980
+  "data": "config/data.json",
+  "encoders": {
+    "vision_patch": {
+      "k": 1,
+      "top_frac": 0.05
     },
-    {
-      "run_name": "anomaly_semantic",
-      "data_path": "data/anomaly_semantic",
-      "out_path": "data/anomaly_semantic/embeddings",
-      "onset_tick": 830,
-      "offset_tick": 1000
+    "physics_roles": {
+      "k": 5,
+      "metrics": [
+        "std_euclidean",
+        "mahalanobis"
+      ]
     },
-    {
-      "run_name": "anomaly_physics",
-      "data_path": "data/anomaly_physics",
-      "out_path": "data/anomaly_physics/embeddings",
-      "onset_tick": 830,
-      "offset_tick": 870
+    "physics_hist": {
+      "k": 5,
+      "metrics": [
+        "std_euclidean",
+        "mahalanobis"
+      ]
     },
-    {
-      "run_name": "anomaly_visual_blur",
-      "data_path": "data/anomaly_visual_blur",
-      "out_path": "data/anomaly_visual_blur/embeddings",
-      "onset_tick": 830,
-      "offset_tick": 980
+    "semantic": {
+      "k": 1,
+      "metric": "cosine",
+      "dedupe_reference": true
+    },
+    "semantic_dist": {
+      "k": 5,
+      "metrics": [
+        "kl_mean",
+        "kl_knn"
+      ]
     }
-  ],
-  "encoders": [
-    "vision",
-    "semantic",
-    "physics"
-  ],
-  "vision_params": {
-    "k": 5,
-    "metric": "cosine"
   },
-  "semantic_params": {
-    "k": 5,
-    "metric": "cosine"
+  "semantic_encoder_params": {
+    "min_score": 0.025,
+    "top_n": 5
   },
-  "physics_params": {
-    "k": 5,
-    "metric": "mahalanobis"
+  "physics_hist_encoder_params": {
+    "history": 10
+  },
+  "text_embedding": {
+    "embedders": [
+      "bert"
+    ]
+  },
+  "output_stem": "anomaly_scores_seeds",
+  "calibration_cache": "conformal_calibration_seeds.npz",
+  "conformal_results": "conformal_seeds.json",
+  "conformal": {
+    "alpha_trans": 0.05,
+    "alpha_cal": 0.1
   },
   "plot": true,
   "show": false

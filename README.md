@@ -10,7 +10,7 @@ Implements a *mixture of representations* (vision / semantic / physics) to catch
 encoders/       the three encoders + OOD scorer
 sim/            actor setup, anomaly injection, ground-truth state extractor
 scripts/        data collection, anomaly injection, run encoders
-config/         one JSON preset per scenario
+config/         sim_*.json scenario presets, data.json runs, encoders*.json encoder settings
 data/           collected runs 
 ```
 
@@ -61,19 +61,19 @@ print('map:', c.get_world().get_map().name)
 conda activate multim_ood
 ../carla_sim/launch_carla.sh &   # start the simulator if it's not already running
 
-# one command per scenario, via a config file (see config/*.json)
-python scripts/run_sim.py --config config/nominal.json
-python scripts/run_sim.py --config config/semantic.json
-python scripts/run_sim.py --config config/physics.json
-python scripts/run_sim.py --config config/visual.json
+# one command per scenario, via a config file (config/sim_*.json); run names are templated on the seed
+python scripts/run_sim.py --config config/sim_nominal.json --seed 3          # -> data/nominal_seed03
+python scripts/run_sim.py --config config/sim_anom_semantic.json --seed 11   # -> data/anom_sem_s11
+python scripts/run_sim.py --config config/sim_anom_physics.json --seed 11    # -> data/anom_phys_s11
+python scripts/run_sim.py --config config/sim_anom_visual.json --seed 11     # -> data/anom_flare_s11
 # flags override individual config values, e.g.:
-python scripts/run_sim.py --config config/physics.json --run-name physics_run_v2 --seed 1
+python scripts/run_sim.py --config config/sim_anom_physics.json --run-name physics_run_v2 --seed 1
 
 # create visual-anomaly variant from an existing nominal run, without recollecting
 python scripts/inject_appearance_corruption.py --src-run nominal_run --dst-run anomaly_blur --corruption blur --onset-frame 800 --duration 150
 
-# encode + score every run defined in config/encoders.json (no CLI flags --
-# edit that file to change run paths, k, metric, or which encoders run)
+# encode + score every run in config/data.json with the encoders in config/encoders.json
+# (no CLI flags -- edit data.json for runs/out paths, encoders.json for encoders/k/metric)
 python scripts/run_encoders.py   # expensive: runs DINOv2/OWL-ViT/BERT/physics over every frame,
                                   # caches raw embeddings to each run's out_path
 python scripts/run_metrics.py    # cheap: scores the cached embeddings via kNN distance
@@ -87,10 +87,18 @@ python scripts/run_metrics.py    # cheap: scores the cached embeddings via kNN d
 
 ```bash
 python scripts/run_nominal_batch.py                          # nominal seeds 1-10 -> data/nominal_seedNN (needs CARLA)
-python scripts/run_encoders.py config/encoders_seeds.json    # vision_patch + physics_roles + semantic (top-n labels)
-python scripts/run_metrics.py  config/encoders_seeds.json    # scores anomaly_runs against the pooled seeds
-python scripts/run_sim.py --config config/semantic.json --seed 3 --trigger-tick 300   # anomaly replay of seed 3
+python scripts/run_encoders.py                              # vision_patch + physics_roles + semantic (top-n labels)
+python scripts/run_metrics.py                               # scores anomaly + negative runs against the pooled seeds
+python scripts/run_conformal.py                             # conformal thresholds; FPR/AUROC vs data.json's negative run
+python scripts/run_encoders.py config/encoders_qwen.json    # Qwen3-VL encoders (same runs, same scoring)
+python scripts/run_sim.py --config config/sim_anom_semantic.json --seed 3   # anomaly replay of seed 3
 ```
+
+Configs: `config/data.json` holds the runs (`reference_runs` = nominal pool, `anomaly_runs` with onset/offset ticks,
+`negative_runs` = held-out nominal); `config/encoders.json` and `config/encoders_qwen.json` hold only encoder settings
+(`encoders` maps each encoder to its scoring params). `text_embedding.embedders` picks the label embedder (`bert`,
+`minilm`, `clip`) for `semantic` and the Qwen label encoders; listing several runs each as its own series
+(`semantic@bert`, `semantic@clip`, ...). Superseded configs are in `config/archive/`.
 
 `semantic` keeps the `top_n` labels whose best-box score reaches `min_score` (`semantic_encoder_params`, default 5 and 0.025).
 `run_sim.py` starts the prop at the first try from `--trigger-tick` where the ego is not at an intersection and no agent is
@@ -103,8 +111,8 @@ within 10 m ahead (retrying every 10 s), and the swerve when the encoder's lead 
 |---|---|---|
 | `run_sim.py` | `--config` `--scenario {nominal,semantic,physics,visual}` `--run-name` `--n-ticks` `--trigger-tick` `--town` `--corruption/--onset-frame/--duration` `--n-background-vehicles/walkers` `--camera-width/height` `--fixed-delta` `--seed` | `--config` loads a JSON file of these same flags (dashes -> underscores as keys); CLI flags override it |
 | `inject_appearance_corruption.py` | `--src-run` `--dst-run` `--corruption {flare,brightness,blur,mixed}` `--onset-frame` `--duration` `--seed` | pure post-processing, no CARLA needed; for deriving extra visual variants from a run you already collected |
-| `run_encoders.py` | none -- reads `config/encoders.json` | vision/semantic are per-frame (no history window); physics uses a 2-frame window so its finite-difference features stay defined |
-| `run_metrics.py` | none -- reads `config/encoders.json` | reads the `.npz` files `run_encoders.py` wrote; `<encoder>_params.k`/`.metric` per encoder control the kNN scoring |
+| `run_encoders.py` | optional config path (default `config/encoders.json`, runs from `config/data.json`) | vision/semantic are per-frame (no history window); physics uses a 2-frame window so its finite-difference features stay defined |
+| `run_metrics.py` | optional config path (as above) | reads the `.npz` files `run_encoders.py` wrote; each encoder's params in `encoders` (`k`, `metric`/`metrics`) control the kNN scoring |
 
 ## Known Sim Issues
 

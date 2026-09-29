@@ -8,7 +8,8 @@ Cheap and rerunnable: doesn't touch DINOv2/OWL-ViT/BERT/CARLA at all, only
 the cached .npz files, so re-scoring with a different k or metric is just
 re-running this script -- run_encoders.py doesn't need to be re-run.
 
-Everything comes from the config file (default config/encoders.json).
+Everything comes from the config file (default config/encoders.json), merged with the run
+lists in config/data.json (see load_config).
 
 Usage:
     .venv/bin/python scripts/run_metrics.py [config/encoders_v2.json]
@@ -26,7 +27,7 @@ from pathlib import Path
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-# optional first CLI arg: a different config file, e.g. config/encoders_v2.json
+# optional first CLI arg: a different config file, e.g. config/encoders_qwen.json
 CONFIG_PATH = Path(sys.argv[1]) if len(sys.argv) > 1 else REPO_ROOT / "config" / "encoders.json"
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -34,6 +35,21 @@ sys.path.insert(0, str(REPO_ROOT))
 def resolve_path(path: str) -> Path:
     p = Path(path)
     return p if p.is_absolute() else REPO_ROOT / p
+
+
+def load_config(path) -> dict:
+    """An encoder config merged with its run lists. `data` names the data config (default
+    config/data.json: reference_runs, anomaly_runs, negative_runs with their out paths); keys set in
+    the encoder config itself win, so older self-contained configs (config/archive/) still load."""
+    cfg = json.loads(Path(path).read_text())
+    if "reference_runs" not in cfg and "reference_run" not in cfg:
+        cfg = {**json.loads(resolve_path(cfg.get("data", "config/data.json")).read_text()), **cfg}
+    return cfg
+
+
+def eval_runs(config: dict) -> list[dict]:
+    """Every run that gets encoded and scored: anomaly runs, then held-out nominal (negative) runs, which have no onset."""
+    return config["anomaly_runs"] + config.get("negative_runs", [])
 
 
 def load_npz(out_path: str, name: str) -> dict:
@@ -92,13 +108,53 @@ def knn_score(query: np.ndarray, reference: np.ndarray, k: int, metric: str, inv
     return float(nearest.mean())
 
 
+def label_distributions(x: np.ndarray, eps: float = 1e-6) -> np.ndarray:
+    """Rows of per-label scores -> probability distributions over labels (eps keeps every log finite)."""
+    p = x.astype(np.float64) + eps
+    return p / p.sum(1, keepdims=True)
+
+
+def score_label_kl(nominal: dict, query: dict, p: dict, metric: str) -> tuple[list[int], list[float]]:
+    """semantic_dist: KL(frame || nominal) between OWL-ViT distributions over the candidate labels
+    (best-box scores normalised to sum to 1; no top_n / min_score cut). kl_mean compares with the mean
+    nominal distribution; kl_knn is the mean of the k smallest KLs to individual nominal frames."""
+    P, R = label_distributions(query["embeddings"]), label_distributions(nominal["embeddings"])
+    neg_entropy = (P * np.log(P)).sum(1)
+    if metric == "kl_mean":
+        d = neg_entropy - P @ np.log(R.mean(0))
+    elif metric == "kl_knn":
+        k = min(p.get("k", 5), len(R))
+        logR = np.log(R).T
+        d = np.concatenate([np.partition(neg_entropy[i : i + 512, None] - P[i : i + 512] @ logR, k - 1, axis=1)[:, :k].mean(1)
+                            for i in range(0, len(P), 512)])
+    else:
+        raise ValueError(f"unknown semantic_dist metric: {metric!r} (expected 'kl_mean' or 'kl_knn')")
+    return query["ticks"].tolist(), d.tolist()
+
+
+def whiten(inv_cov: np.ndarray) -> np.ndarray:
+    """W with W.T @ W = inv_cov, so ||W (a - b)|| is the Mahalanobis distance between a and b."""
+    vals, vecs = np.linalg.eigh((inv_cov + inv_cov.T) / 2)
+    return (vecs * np.sqrt(np.clip(vals, 0, None))).T
+
+
 def score_per_frame(nominal: dict, query: dict, k: int, metric: str, inv_cov: np.ndarray | None) -> tuple[list[int], list[float]]:
-    """vision/physics: one embedding per tick, in query['ticks']/['embeddings']."""
+    """vision/physics: one embedding per tick, in query['ticks']/['embeddings']. Mahalanobis is computed
+    by whitening once and taking Euclidean kNN in batches (per-query einsum is O(N D^2) per frame, which
+    is prohibitive for the 436-d history physics embedding)."""
     ticks = query["ticks"].tolist()
-    scores = [
-        knn_score(query["embeddings"][i], nominal["embeddings"], k, metric, inv_cov)
-        for i in range(len(ticks))
-    ]
+    if metric != "mahalanobis":
+        return ticks, [knn_score(q, nominal["embeddings"], k, metric, inv_cov) for q in query["embeddings"]]
+    W = whiten(inv_cov)
+    R = nominal["embeddings"].astype(np.float64) @ W.T
+    Q = query["embeddings"].astype(np.float64) @ W.T
+    r2 = (R**2).sum(1)
+    kk = min(k, len(R))
+    scores = []
+    for i in range(0, len(Q), 256):
+        q = Q[i : i + 256]
+        d = np.sqrt(np.clip((q**2).sum(1)[:, None] + r2[None] - 2 * q @ R.T, 0, None))
+        scores += np.partition(d, kk - 1, axis=1)[:, :kk].mean(1).tolist()
     return ticks, scores
 
 
@@ -115,6 +171,9 @@ def score_semantic_per_frame(nominal: dict, query: dict, k: int, metric: str, in
         per_frame_best[t] = max(d, per_frame_best.get(t, float("-inf")))
     for t, d in per_frame_best.items():
         scores[t] = d
+    if "ticks" in query:  # strided encoders (qwen_*): only the frames that were actually processed
+        ticks = query["ticks"].tolist()
+        return ticks, [per_frame_best.get(t, float("nan")) for t in ticks]
     return list(range(n_frames)), scores
 
 
@@ -218,10 +277,14 @@ def metrics_of(p: dict) -> list:
 
 
 def score_encoder(name, nominal, query, p, metric, inv_cov):
-    """Per-frame scores of one encoder under one metric."""
+    """Per-frame scores of one encoder under one metric. A tag after '@' (qwen_labels@clip) only picks
+    the cached file and params; scoring follows the base encoder."""
+    name = name.split("@")[0]
     if name == "vision_patch":
         return score_vision_patch(nominal, query, p.get("top_frac", 0.05), p.get("k", 1))
-    if name == "physics_roles" and metric in (None, "std_euclidean"):
+    if name == "semantic_dist":
+        return score_label_kl(nominal, query, p, metric)
+    if name in ("physics_roles", "physics_hist") and metric in (None, "std_euclidean"):
         return score_std_euclidean(nominal, query, p.get("k", 5))
     if name in ("semantic", "qwen_labels", "qwen_judge_labels"):
         return score_semantic_per_frame(nominal, query, p["k"], metric, inv_cov)
@@ -251,13 +314,18 @@ def plot_run(
     cosine = {k: v for k, v in scores.items() if k in ("vision", "semantic")}
     if cosine:
         groups.append(cosine)
-    for enc in dict.fromkeys(enc_of(k) for k in scores if k not in ("vision", "semantic")):
-        groups.append({k: v for k, v in scores.items() if enc_of(k) == enc})
+    # one row per encoder, except that metrics on different scales (cosine vs whitened distance) get their own rows
+    scale = lambda k: "cosine" if k.endswith("/cosine") else "other"
+    for enc, sc in dict.fromkeys((enc_of(k), scale(k)) for k in scores if k not in ("vision", "semantic")):
+        groups.append({k: v for k, v in scores.items() if enc_of(k) == enc and scale(k) == sc})
     if not groups:
         return
 
     colours = {"vision": "tab:blue", "semantic": "tab:orange", "physics": "tab:green", "vision_patch": "tab:blue", "physics_roles": "tab:green"}
-    ylabels = {"physics": "Mahalanobis distance (kNN)", "vision_patch": "patch cosine distance", "physics_roles": "std. Euclidean (kNN)"}
+    ylabels = {"physics": "Mahalanobis distance (kNN)", "vision_patch": "patch cosine distance", "physics_roles": "std. Euclidean (kNN)",
+               "qwen_labels": "label cosine distance (k=1)", "qwen_judge_labels": "label cosine distance (k=1)",
+               "qwen_judge_score": "VLM anomaly score / 10", "qwen_hidden/pca_whiten": "whitened PCA distance (kNN)",
+               "qwen_hidden/cosine": "centred cosine distance (kNN)"}
     styles = ["-", "--", ":", "-."]
     fig, axes = plt.subplots(len(groups), 1, figsize=(10, 4.5 * len(groups)), squeeze=False)
     for ax, grp in zip(axes[:, 0], groups):
@@ -267,8 +335,11 @@ def plot_run(
         for n, (key, (ticks, vals)) in enumerate(grp.items()):
             v = np.array(vals, dtype=float)
             label = f"{key} embedding"
-            ax.plot(ticks, v, linewidth=1.5, color=colours.get(enc_of(key)), linestyle=styles[n % len(styles)], label=label)
-        ax.set_ylabel("distance (kNN)" if multi else ylabels.get(next(iter(grp)), "cosine distance (kNN)"))
+            ok = ~np.isnan(v)  # sparse series (strided / frames without labels) would otherwise draw no segments
+            ticks, v = np.asarray(ticks)[ok], v[ok]
+            ax.plot(ticks, v, linewidth=1.5, marker="." if len(v) < 200 else None, markersize=3, color=colours.get(enc_of(key)), linestyle=styles[n % len(styles)], label=label)
+        first = next(iter(grp))
+        ax.set_ylabel("distance (kNN)" if multi else ylabels.get(first, ylabels.get(enc_of(first), "cosine distance (kNN)")))
         if set(grp) == {"semantic"}:
             ax.set_ylim(-0.4, 0.4)
         ax.legend(loc="upper right", fontsize=9)
@@ -286,19 +357,42 @@ def plot_run(
         plt.close(fig)
 
 
+LABEL_ENCODERS = ("semantic", "qwen_labels", "qwen_judge_labels")
+
+
+def active_encoders(config: dict) -> list[str]:
+    """Encoder names to run and score. `encoders` is either a list of names or a {name: params} object.
+    If `text_embedding.embedders` lists several embedders, each label encoder expands to one variant per
+    embedder (qwen_labels@bert, qwen_labels@minilm, ...), each with its own files, column and threshold."""
+    names = list(config["encoders"])
+    embedders = config.get("text_embedding", {}).get("embedders", [])
+    if len(embedders) > 1:
+        names = [f"{n}@{e}" if n in LABEL_ENCODERS else n for n in names for e in (embedders if n in LABEL_ENCODERS else [None])]
+    return names
+
+
 def params_from_config(config: dict) -> dict:
-    """Per-encoder scoring parameters, with defaults for anything the config omits."""
-    return {
+    """Per-encoder scoring parameters, with defaults for anything the config omits. Params come from the
+    `encoders` object when it is one, else from top-level <name>_params keys."""
+    out = {
         "vision": config.get("vision_params", {"k": 5, "metric": "cosine"}),
         "semantic": config.get("semantic_params", {"k": 5, "metric": "cosine"}),
         "physics": config.get("physics_params", {"k": 5, "metric": "mahalanobis"}),
         "vision_patch": config.get("vision_patch_params", {"k": 1, "top_frac": 0.05}),
         "physics_roles": config.get("physics_roles_params", {"k": 5, "metric": "std_euclidean"}),
+        "physics_hist": config.get("physics_hist_params", {"k": 5, "metrics": ["std_euclidean", "mahalanobis"]}),
+        "semantic_dist": config.get("semantic_dist_params", {"k": 5, "metrics": ["kl_mean", "kl_knn"]}),
         "qwen_labels": config.get("qwen_labels_params", {"k": 1, "metric": "cosine", "dedupe_reference": True}),
         "qwen_judge_labels": config.get("qwen_judge_labels_params", {"k": 1, "metric": "cosine", "dedupe_reference": True}),
         "qwen_judge_score": config.get("qwen_judge_score_params", {"k": 1, "metric": "raw"}),
         "qwen_hidden": config.get("qwen_hidden_params", {"k": 5, "metric": "pca_whiten", "layer": 18, "pool": "last_prompt", "n_components": 64}),
     }
+    if isinstance(config.get("encoders"), dict):
+        out.update({name: p for name, p in config["encoders"].items() if p})
+    for name in active_encoders(config) if "encoders" in config else []:  # embedder variants share the base encoder's params
+        if "@" in name:
+            out[name] = config.get(f"{name}_params", out[name.split("@")[0]])
+    return out
 
 
 def build_reference(ref_paths: list[str], active_encoders: list[str], params: dict):
@@ -324,20 +418,20 @@ def series_of(active_encoders: list[str], params: dict) -> list[tuple[str, str, 
 
 
 def main():
-    config = json.loads(CONFIG_PATH.read_text())
-    active_encoders = config["encoders"]
+    config = load_config(CONFIG_PATH)
+    active = active_encoders(config)
     stem = config.get("output_stem", "anomaly_scores")
     params = params_from_config(config)
     refs = config.get("reference_runs") or [config["reference_run"]]
-    nominal, inv_cov = build_reference([r["out_path"] for r in refs], active_encoders, params)
-    series = series_of(active_encoders, params)
+    nominal, inv_cov = build_reference([r["out_path"] for r in refs], active, params)
+    series = series_of(active, params)
 
-    for run in config["anomaly_runs"]:
+    for run in eval_runs(config):
         print(f"=== {run['run_name']} ===")
         out_path = resolve_path(run["out_path"])
         scores: dict[str, tuple[list[int], list[float]]] = {}
 
-        queries = {name: load_npz(run["out_path"], name) for name in active_encoders}
+        queries = {name: load_npz(run["out_path"], name) for name in active}
         for key, name, metric in series:
             ticks, vals = score_encoder(name, nominal[name], queries[name], params[name], metric, inv_cov.get(name))
             scores[key] = (ticks, vals)
@@ -345,7 +439,7 @@ def main():
 
         # union of all ticks any encoder scored, so the CSV has one row per
         # tick even though encoders can cover different tick ranges/subsets
-        # (physics skips tick 0, physics_roles ticks 0-1, semantic skips zero-detection ticks)
+        # (physics skips tick 0, physics_roles the first window-1 ticks, semantic skips zero-detection ticks)
         all_ticks = sorted(set().union(*(set(t) for t, _ in scores.values())))
         by_tick = {
             name: dict(zip(ticks, vals))
