@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOD runs</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root { --bg:#101214; --panel:#181b1f; --line:#2a2f36; --text:#e8eaed; --dim:#9aa0a6; --alert:#ff5c5c; --accent:#5aa9ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui, sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:var(--panel); border-bottom:1px solid var(--line); padding:10px 16px;
+           display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; }
+  h1 { font-size:15px; margin:0; }
+  nav { display:flex; gap:4px; }
+  nav button { background:none; border:1px solid transparent; color:var(--dim); padding:6px 14px; border-radius:6px; font:inherit; cursor:pointer; }
+  nav button.on { color:var(--text); border-color:var(--line); background:var(--bg); }
+  select, button.ctl, input[type=number] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 9px; font:inherit; }
+  button.ctl { cursor:pointer; }
+  button.ctl:hover, nav button:hover { border-color:var(--dim); }
+  a { color:var(--accent); }
+  main { padding:16px; }
+  .tab { display:none; } .tab.on { display:block; }
+  .bar { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; margin-bottom:12px; }
+  .chip { padding:2px 9px; border-radius:10px; border:1px solid var(--line); color:var(--dim); font-size:12px; white-space:nowrap; }
+  .chip.alert { color:var(--alert); border-color:var(--alert); }
+  .dim { color:var(--dim); }
+  video { width:100%; max-height:calc(100vh - 150px); background:#000; border-radius:6px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(400px, 1fr)); gap:10px; }
+  figure { margin:0; background:var(--panel); border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  figure img { display:block; width:100%; }
+  figcaption { padding:5px 10px; font-size:12px; color:var(--dim); }
+  input[type=range] { flex:1; min-width:240px; accent-color:var(--accent); }
+  fieldset { border:1px solid var(--line); border-radius:6px; margin:0; padding:6px 10px; }
+  legend { color:var(--dim); font-size:12px; padding:0 4px; }
+  fieldset label { margin-right:12px; white-space:nowrap; }
+  .empty { padding:40px; text-align:center; color:var(--dim); border:1px dashed var(--line); border-radius:6px; }
+  code { background:var(--panel); padding:1px 5px; border-radius:4px; }
+  .sum-h { font-size:15px; margin:18px 0 4px; } .sum-h:first-child { margin-top:0; }
+  #rates { overflow-x:auto; }
+  table.rates { border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums; }
+  table.rates th, table.rates td { padding:5px 8px; border:1px solid var(--line); text-align:center; white-space:nowrap; }
+  table.rates th { color:var(--dim); font-weight:500; position:sticky; top:0; background:var(--bg); }
+  table.rates th.row, table.rates td.row { text-align:left; color:var(--text); }
+  table.rates tr.top td.row { font-weight:600; }
+  table.rates td.cell { cursor:pointer; }
+  table.rates td.cell.picked { outline:2px solid var(--text); outline-offset:-2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>OOD runs</h1>
+  <nav>
+    <button data-tab="summary" id="summary-tab">Summary</button>
+    <button data-tab="videos" class="on">Videos</button>
+    <button data-tab="images">Images</button>
+    <button data-tab="scores">Scores</button>
+  </nav>
+  <label>data <select id="ds"></select></label>
+  <label>run <select id="run"></select></label>
+  <span id="info"></span>
+  <span style="flex:1"></span>
+  <span class="chip" id="tickchip">tick 0</span>
+  <a id="tb" target="_blank" hidden>TensorBoard ↗</a>
+</header>
+<main>
+  <section id="summary" class="tab">
+    <h2 class="sum-h">Run-level detection rate</h2>
+    <p class="dim">Share of runs flagged by each score's conformal threshold τ (a run is flagged when more than α<sub>trans</sub> of its anomaly-window frames are above τ). The last row is the false-alarm rate on held-out nominal runs. Click a cell to plot that score below.</p>
+    <div id="rates"></div>
+    <h2 class="sum-h">Every run's score vs τ</h2>
+    <div class="bar">
+      <label>score <select id="sum-series"></select></label>
+      <label><input type="checkbox" id="sum-log"> log scale</label>
+      <span class="dim">one dot per run: its window's Q (nominal runs: the whole run's) · grey = calibration runs that set τ · click a dot to open that run</span>
+    </div>
+    <div id="strip"></div>
+  </section>
+
+  <section id="videos" class="tab on">
+    <div class="bar">
+      <label>speed <select id="speed"><option>0.25</option><option>0.5</option><option selected>1</option><option>2</option><option>4</option></select></label>
+      <button class="ctl" id="v-onset">jump to anomaly onset</button>
+      <span class="dim">camera · scores · DINO patch distance · OWL-ViT boxes · top-down · Qwen, 10 ticks per second</span>
+    </div>
+    <video id="video" controls preload="metadata"></video>
+    <div id="video-empty" class="empty" hidden></div>
+  </section>
+
+  <section id="images" class="tab">
+    <div class="bar">
+      <button class="ctl" id="i-prev">◀</button>
+      <input type="range" id="slider" min="0" max="0" value="0">
+      <button class="ctl" id="i-next">▶</button>
+      <button class="ctl" id="i-play">play</button>
+      <button class="ctl" id="i-onset">onset</button>
+      <button class="ctl" id="i-offset">offset</button>
+      <span class="dim">← → keys step</span>
+    </div>
+    <div class="grid" id="panels"></div>
+    <div id="images-empty" class="empty" hidden></div>
+  </section>
+
+  <section id="scores" class="tab">
+    <div class="bar">
+      <label>compare with <select id="compare"></select></label>
+      <label><input type="checkbox" id="norm"> divide by τ</label>
+      <button class="ctl" id="s-default">headline series</button>
+      <button class="ctl" id="s-all">all</button>
+      <span class="dim">dashed = conformal threshold τ · light band = anomaly window · click a point to set the tick for the other tabs</span>
+    </div>
+    <div class="bar" id="series"></div>
+    <div id="plot"></div>
+  </section>
+</main>
+
+<script>window.STATIC_SITE = true;</script>
+<script>
+const $ = id => document.getElementById(id);
+const PANEL_NAMES = {camera:"Ego camera", dino:"DINOv2 patch distance", owlvit:"OWL-ViT detections", topdown:"Top-down (ego frame)", qwen:"Qwen3-VL"};
+const FAMILY_COLOURS = {vision:"#5aa9ff", semantics:"#ffa64d", physics:"#5fd38d"};
+const S = {ds:null, index:null, run:null, tick:0, tab:"videos", picked:new Set(), scores:{}, timer:null, summary:null};
+// served by analysis/serve.py, or exported as static files by analysis/export_static.py (window.STATIC_SITE)
+const STATIC = !!window.STATIC_SITE;
+function apiUrl(path) {
+  if (!STATIC) return path === "/api/datasets" ? path : `${path}?ds=${encodeURIComponent(S.ds)}`;
+  if (path === "/api/datasets") return "data/datasets.json";
+  const ds = encodeURIComponent(S.ds);
+  if (path.startsWith("/api/scores/")) return `data/${ds}/scores/${path.split("/").pop()}.json`;
+  return `data/${ds}/${path.split("/").pop()}.json`;   // /api/index, /api/summary
+}
+const api = (path) => fetch(apiUrl(path)).then(r => r.json());
+
+const runObj = name => S.index.runs.find(r => r.name === name);
+const pad = t => String(t).padStart(6, "0");
+
+async function scoresOf(name) {
+  if (!S.scores[name]) S.scores[name] = await api(`/api/scores/${name}`);
+  return S.scores[name];
+}
+
+function setTick(t, from) {
+  S.tick = Math.max(0, Math.round(t));
+  $("tickchip").textContent = `tick ${S.tick} · ${(S.tick / S.index.fps).toFixed(1)} s`;
+  const r = runObj(S.run);
+  $("tickchip").classList.toggle("alert", r.onset != null && S.tick >= r.onset && S.tick < (r.offset ?? Infinity));
+  if (from !== "video" && $("video").src && $("video").readyState) $("video").currentTime = S.tick / S.index.fps;
+  if (from !== "images") showImages();
+}
+
+function showInfo() {
+  const r = runObj(S.run), a = r.anomaly;
+  // batch runs log a kind (cut_in, crowd, ...); the original seed-11 runs only a blueprint / corruption, and their one physics run is a lead swerve
+  const kind = a && (a.kind || a.blueprint || a.corruption || (a.anomaly_type === "physics" ? "lead vehicle swerve" : ""));
+  const what = a ? [a.anomaly_type, kind && kind.replace(/_/g, " ")].filter(Boolean).join(" · ") : (r.split === "reference_runs" ? "nominal reference run" : "nominal run");
+  $("info").innerHTML = `<span class="chip ${a ? "alert" : ""}">${what}</span>` + (r.onset != null ? ` <span class="chip">window ${r.onset}–${r.offset}</span>` : "");
+  for (const id of ["v-onset", "i-onset", "i-offset"]) $(id).disabled = r.onset == null;
+}
+
+function showVideo() {
+  const r = runObj(S.run), v = $("video");
+  v.hidden = !r.video; $("video-empty").hidden = !!r.video;
+  if (r.video) {
+    v.src = r.video;
+    v.onloadedmetadata = () => { v.playbackRate = +$("speed").value; v.currentTime = S.tick / S.index.fps; };
+  } else {
+    v.removeAttribute("src");
+    $("video-empty").innerHTML = `No video for <b>${r.name}</b>: only selected runs are rendered (marked ▶ in the run list). Its scores are in the Scores tab.`;
+  }
+}
+
+function nearestPanelTick() {
+  const ticks = runObj(S.run).panel_ticks;
+  return ticks.reduce((best, t) => Math.abs(t - S.tick) < Math.abs(best - S.tick) ? t : best, ticks[0]);
+}
+
+function showImages() {
+  const r = runObj(S.run), has = r.panel_ticks.length > 0;
+  $("panels").hidden = !has; $("images-empty").hidden = has;
+  if (!has) {
+    $("images-empty").innerHTML = `No stills for <b>${r.name}</b>: only selected runs are rendered (marked ▶ in the run list).`;
+    return;
+  }
+  const t = nearestPanelTick(), sl = $("slider");
+  sl.max = r.panel_ticks.length - 1; sl.value = r.panel_ticks.indexOf(t);
+  if ($("panels").children.length !== r.panels.length)
+    $("panels").innerHTML = r.panels.map(p => `<figure><img data-panel="${p}" alt="${PANEL_NAMES[p]}"><figcaption></figcaption></figure>`).join("");
+  for (const img of $("panels").querySelectorAll("img")) {
+    img.src = `${r.stills_base}/${img.dataset.panel}/${pad(t)}.jpg`;
+    img.nextElementSibling.textContent = `${PANEL_NAMES[img.dataset.panel]} · frame ${t}`;
+  }
+}
+
+function stepImages(d) {
+  const ticks = runObj(S.run).panel_ticks;
+  if (!ticks.length) return;
+  const i = Math.min(ticks.length - 1, Math.max(0, ticks.indexOf(nearestPanelTick()) + d));
+  setTick(ticks[i]);
+  if (i === ticks.length - 1 && S.timer) togglePlay();
+}
+
+function togglePlay() {
+  if (S.timer) { clearInterval(S.timer); S.timer = null; } else S.timer = setInterval(() => stepImages(1), 250);
+  $("i-play").textContent = S.timer ? "pause" : "play";
+}
+
+function buildSeriesBoxes() {
+  const fam = S.index.families, groups = {};
+  for (const k of runObj(S.run).series) (groups[fam[k]] ||= []).push(k);
+  $("series").innerHTML = Object.entries(groups).map(([g, keys]) =>
+    `<fieldset><legend style="color:${FAMILY_COLOURS[g]}">${g}</legend>` + keys.map(k =>
+      `<label><input type="checkbox" value="${k}" ${S.picked.has(k) ? "checked" : ""}> ${k}</label>`).join("") + `</fieldset>`).join("");
+  $("series").onchange = e => { e.target.checked ? S.picked.add(e.target.value) : S.picked.delete(e.target.value); drawScores(); };
+}
+
+async function drawScores() {
+  if (S.tab !== "scores") return;
+  const r = runObj(S.run), cmp = $("compare").value, norm = $("norm").checked, tau = S.index.thresholds;
+  const keys = r.series.filter(k => S.picked.has(k));
+  if (!keys.length) { Plotly.purge("plot"); $("plot").innerHTML = `<div class="empty">Pick at least one series.</div>`; return; }
+  if ($("plot").querySelector(".empty")) $("plot").innerHTML = "";
+  const mine = await scoresOf(S.run), other = cmp ? await scoresOf(cmp) : null;
+  const traces = [], shapes = [], annotations = [], layout = {};
+  keys.forEach((k, i) => {
+    const ax = i === 0 ? "" : i + 1, div = norm && tau[k] ? tau[k] : 1, col = S.index.colours[k] || FAMILY_COLOURS[S.index.families[k]];
+    const sparse = mine[k].t.length < 200;
+    const mk = (d, name, colour, width) => ({x:d.t, y:d.v.map(v => v / div), name, xaxis:"x", yaxis:"y" + ax, type:"scatter",
+      mode: sparse ? "lines+markers" : "lines", marker:{size:4}, line:{color:colour, width}, legendgroup:name, showlegend:i === 0,
+      hovertemplate:"%{y:.4g}<extra>" + name + "</extra>"});
+    if (other && other[k]) traces.push(mk(other[k], cmp, "#6b7380", 1.2));
+    traces.push(mk(mine[k], S.run, col, 1.8));
+    const dom = [1 - (i + 1) / keys.length + 0.035, 1 - i / keys.length - 0.02];
+    layout["yaxis" + ax] = {domain:dom, gridcolor:"#2a2f36", zeroline:false, title:{text: norm && tau[k] ? "score / τ" : "raw score", font:{size:11}}, rangemode:"tozero"};
+    const t = tau[k] ? tau[k] / div : null;
+    if (t) shapes.push({type:"line", xref:"paper", x0:0, x1:1, yref:"y" + ax, y0:t, y1:t, line:{color:"#e8eaed", width:1, dash:"dash"}});
+    annotations.push({xref:"paper", yref:"paper", x:0.004, y:dom[1], xanchor:"left", yanchor:"top", showarrow:false, bgcolor:"rgba(16,18,20,.7)",
+      font:{color:col, size:12}, text:`<b>${S.index.names[k] ? S.index.names[k] + " · " : ""}${k}</b>` + (tau[k] ? `  τ = ${(+tau[k]).toPrecision(4)}` : (tau[k] === 0 ? "  τ = 0" : "  no τ"))});
+  });
+  if (r.onset != null) shapes.push({type:"rect", xref:"x", x0:r.onset, x1:r.offset ?? r.onset, yref:"paper", y0:0, y1:1, fillcolor:"#e8eaed", opacity:0.09, line:{width:0}, layer:"below"});
+  shapes.push({type:"line", xref:"x", x0:S.tick, x1:S.tick, yref:"paper", y0:0, y1:1, line:{color:"#e8eaed", width:1}});
+  Object.assign(layout, {height:Math.max(260, 210 * keys.length + 60), paper_bgcolor:"#101214", plot_bgcolor:"#181b1f", font:{color:"#e8eaed"},
+    margin:{l:64, r:16, t:36, b:44}, hovermode:"x unified", shapes, annotations, legend:{orientation:"h", y:1, yanchor:"bottom", x:1, xanchor:"right"},
+    xaxis:{title:"tick", gridcolor:"#2a2f36", zeroline:false, anchor: "y" + (keys.length > 1 ? keys.length : "")}});
+  await Plotly.react("plot", traces, layout, {responsive:true, displaylogo:false});
+  $("plot").removeAllListeners?.("plotly_click");
+  $("plot").on("plotly_click", e => { setTick(e.points[0].x); drawScores(); });
+}
+
+function setRun(name) {
+  S.run = name;
+  $("run").value = name;
+  const r = runObj(name);
+  $("panels").innerHTML = "";
+  showInfo(); showVideo(); buildSeriesBoxes();
+  setTick(r.onset ?? 0);
+  drawScores();
+}
+
+function setTab(tab) {
+  S.tab = tab;
+  for (const b of document.querySelectorAll("nav button")) b.classList.toggle("on", b.dataset.tab === tab);
+  for (const s of document.querySelectorAll(".tab")) s.classList.toggle("on", s.id === tab);
+  if (tab !== "videos") $("video").pause();
+  if (tab !== "images" && S.timer) togglePlay();
+  if (tab === "scores") drawScores();
+  if (tab === "summary") drawSummary();
+  saveHash();
+}
+
+function saveHash() { location.hash = [S.tab, S.run, S.ds].map(encodeURIComponent).join("/"); }
+
+const fmtSeries = k => (S.index.names[k] ? `${S.index.names[k]}<br><span class="dim">${k}</span>` : k);
+
+async function drawSummary() {
+  if (!S.index.has_summary) {
+    $("rates").innerHTML = `<div class="empty">No summary for this dataset: it has no separate calibration runs. Pick a batch dataset.</div>`;
+    $("strip").innerHTML = ""; return;
+  }
+  if (!S.summary) S.summary = await api("/api/summary");
+  const sm = S.summary, series = sm.series;
+  if (!series.length) { $("rates").innerHTML = `<div class="empty">Not scored yet: run run_metrics.py and run_conformal.py on this dataset's configs.</div>`; return; }
+  if (!$("sum-series").options.length) {
+    $("sum-series").innerHTML = series.map(k => `<option value="${k}">${S.index.names[k] || k} · ${k}</option>`).join("");
+    $("sum-series").value = series.includes("vision_patch") ? "vision_patch" : series[0];
+  }
+  // each anomaly type followed by its kinds, false alarms last
+  const groups = Object.keys(sm.rates).sort((a, b) => (a === "false alarms") - (b === "false alarms") || a.split("/")[0].localeCompare(b.split("/")[0]) || (a.includes("/") - b.includes("/")) || a.localeCompare(b));
+  const cell = (g, k) => {
+    const v = sm.rates[g][k];
+    if (v == null) return `<td>–</td>`;
+    const fa = g === "false alarms", a = fa ? v : v;   // false alarms: red = bad; detection: green = good
+    const bg = fa ? `rgba(255,92,92,${0.12 + 0.6 * a})` : `rgba(95,211,141,${0.08 + 0.62 * a})`;
+    return `<td class="cell${$("sum-series").value === k ? " picked" : ""}" data-k="${k}" style="background:${bg}">${(100 * v).toFixed(0)}%</td>`;
+  };
+  $("rates").innerHTML = `<table class="rates"><tr><th class="row">group</th><th>runs</th>${series.map(k => `<th>${fmtSeries(k)}</th>`).join("")}</tr>` +
+    groups.map(g => `<tr class="${g.includes("/") ? "" : "top"}"><td class="row">${g.includes("/") ? "&nbsp;&nbsp;" + g.split("/")[1] : g}</td><td>${sm.n[g] ?? ""}</td>${series.map(k => cell(g, k)).join("")}</tr>`).join("") + `</table>`;
+  for (const td of $("rates").querySelectorAll("td.cell")) td.onclick = () => { $("sum-series").value = td.dataset.k; drawSummary(); };
+  drawStrip();
+}
+
+function drawStrip() {
+  const sm = S.summary, k = $("sum-series").value, tau = sm.tau[k];
+  const order = ["calibration nominal", "held-out nominal", ...[...new Set(sm.runs.map(r => r.group))].filter(g => g !== "held-out nominal").sort()];
+  const traces = [];
+  const jitter = (i) => ((i * 0.6180339887) % 1 - 0.5) * 0.5;
+  const cal = (sm.calibration_Q[k] || []);
+  traces.push({x: cal.map((_, i) => order.indexOf("calibration nominal") + jitter(i)), y: cal, mode: "markers", type: "scatter", name: "calibration",
+               marker: {color: "#6b7380", size: 7}, hovertemplate: "calibration run<br>Q %{y:.4g}<extra></extra>"});
+  for (const g of order.slice(1)) {
+    const runs = sm.runs.filter(r => r.group === g && r.Q[k] != null);
+    const nominal = g === "held-out nominal";
+    traces.push({x: runs.map((_, i) => order.indexOf(g) + jitter(i)), y: runs.map(r => r.Q[k]), mode: "markers", type: "scatter", name: g,
+      customdata: runs.map(r => r.name), text: runs.map(r => (r.flagged[k] ? "flagged" : "not flagged") + (r.auroc[k] != null ? ` · AUROC ${r.auroc[k].toFixed(2)}` : "")),
+      marker: {size: 8, color: nominal ? "#9aa0a6" : runs.map(r => r.flagged[k] ? "#5fd38d" : "#ff7ab6"), line: {width: 1, color: "#101214"}},
+      hovertemplate: "%{customdata}<br>Q %{y:.4g} · %{text}<extra></extra>"});
+  }
+  const layout = {height: 460, paper_bgcolor: "#101214", plot_bgcolor: "#181b1f", font: {color: "#e8eaed"}, showlegend: false,
+    margin: {l: 70, r: 16, t: 20, b: 110}, hovermode: "closest",
+    xaxis: {tickmode: "array", tickvals: order.map((_, i) => i), ticktext: order.map(g => g.replace("/", "<br>")), gridcolor: "#2a2f36", zeroline: false},
+    yaxis: {title: {text: `${k} · run Q`, font: {size: 11}}, gridcolor: "#2a2f36", zeroline: false, type: $("sum-log").checked ? "log" : "linear"},
+    shapes: tau != null && isFinite(tau) ? [{type: "line", xref: "paper", x0: 0, x1: 1, y0: tau, y1: tau, line: {color: "#e8eaed", dash: "dash", width: 1}}] : [],
+    annotations: tau != null ? [{xref: "paper", x: 1, y: tau, xanchor: "right", yanchor: "bottom", showarrow: false, text: `τ = ${(+tau).toPrecision(4)}`, font: {size: 11}}] : []};
+  Plotly.react("strip", traces, layout, {responsive: true, displaylogo: false}).then(() => {
+    $("strip").removeAllListeners?.("plotly_click");
+    $("strip").on("plotly_click", e => { const name = e.points[0].customdata; if (name && runObj(name)) { setRun(name); setTab("scores"); } });
+  });
+}
+
+async function loadDataset(ds, run, tab) {
+  S.ds = ds; S.scores = {}; S.summary = null;
+  $("sum-series").innerHTML = "";
+  S.index = await api("/api/index");
+  const runs = S.index.runs, groups = {};
+  for (const r of runs) (groups[r.split === "anomaly_runs" ? r.group : r.split === "negative_runs" ? "held-out nominal" : r.split === "calibration_runs" ? "calibration nominal" : r.split === "reference_runs" ? "reference nominal (scored against its own pool)" : r.group] ||= []).push(r);
+  const label = r => r.name + (r.video ? "  ▶" : "");
+  $("run").innerHTML = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([g, rs]) =>
+    `<optgroup label="${g} (${rs.length})">${rs.map(r => `<option value="${r.name}">${label(r)}</option>`).join("")}</optgroup>`).join("");
+  const nominal = runs.filter(r => !r.anomaly);
+  $("compare").innerHTML = `<option value="">nothing</option>` + nominal.map(r => `<option>${r.name}</option>`).join("");
+  if (nominal.length) $("compare").value = (nominal.find(r => r.split === "negative_runs") || nominal[0]).name;
+  S.picked = new Set(S.index.default_series);
+  $("summary-tab").hidden = !S.index.has_summary;
+  const withVideo = runs.find(r => r.video) || runs[0];
+  setRun(runObj(run) ? run : withVideo.name);
+  setTab(tab || (S.index.has_summary ? "summary" : "videos"));
+}
+
+async function init() {
+  const datasets = await api("/api/datasets");
+  $("ds").innerHTML = datasets.map(d => `<option>${d}</option>`).join("");
+  const [tab, run, ds] = location.hash.slice(1).split("/").map(decodeURIComponent);
+  $("ds").value = datasets.includes(ds) ? ds : datasets[0];
+  $("ds").onchange = e => loadDataset(e.target.value);
+  $("sum-series").onchange = drawSummary;
+  $("sum-log").onchange = drawStrip;
+
+  for (const b of document.querySelectorAll("nav button")) b.onclick = () => setTab(b.dataset.tab);
+  $("run").onchange = e => { setRun(e.target.value); saveHash(); };
+  $("speed").onchange = e => $("video").playbackRate = +e.target.value;
+  $("video").ontimeupdate = () => { if (S.tab === "videos") setTick($("video").currentTime * S.index.fps, "video"); };
+  $("v-onset").onclick = () => setTick(Math.max(0, runObj(S.run).onset - 20));
+  $("slider").oninput = e => setTick(runObj(S.run).panel_ticks[+e.target.value]);
+  $("i-prev").onclick = () => stepImages(-1);
+  $("i-next").onclick = () => stepImages(1);
+  $("i-play").onclick = togglePlay;
+  $("i-onset").onclick = () => setTick(runObj(S.run).onset);
+  $("i-offset").onclick = () => setTick(runObj(S.run).offset - 1);
+  $("compare").onchange = $("norm").onchange = drawScores;
+  $("s-default").onclick = () => { S.picked = new Set(S.index.default_series); buildSeriesBoxes(); drawScores(); };
+  $("s-all").onclick = () => { S.picked = new Set(runObj(S.run).series); buildSeriesBoxes(); drawScores(); };
+  document.onkeydown = e => {
+    if (S.tab !== "images" || e.target.tagName === "SELECT") return;
+    if (e.key === "ArrowLeft") { stepImages(-1); e.preventDefault(); }
+    if (e.key === "ArrowRight") { stepImages(1); e.preventDefault(); }
+  };
+
+  await loadDataset($("ds").value, run, ["summary", "videos", "images", "scores"].includes(tab) ? tab : null);
+  if (S.index.tensorboard) { $("tb").href = S.index.tensorboard; $("tb").hidden = false; }
+}
+init();
+</script>
+</body>
+</html>
