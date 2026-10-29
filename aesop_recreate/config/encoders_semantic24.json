@@ -1,0 +1,197 @@
+{
+  "data": "aesop_recreate/config/data_semantic24.json",
+  "encoders": {
+    "gt@e5_mistral": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "gt@minilm": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "gt@mpnet": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "gt@bert_large": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "owl@e5_mistral": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "owl@minilm": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "owl@mpnet": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "owl@bert_large": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "qwen_closed@e5_mistral": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "qwen_closed@minilm": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "qwen_closed@mpnet": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "qwen_closed@bert_large": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "qwen_open@e5_mistral": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "qwen_open@minilm": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "qwen_open@mpnet": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "qwen_open@bert_large": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "clip_image": {
+      "metrics": [
+        "cosine_k1",
+        "cosine_k3",
+        "cosine_k5",
+        "cosine_k10",
+        "mahalanobis"
+      ]
+    },
+    "vision_patch": {
+      "metrics": [
+        "patch"
+      ]
+    }
+  },
+  "output_stem": "scores_semantic24",
+  "calibration_cache": "../aesop_recreate/data/semantic24/calibration_withheld.npz",
+  "conformal_results": "../aesop_recreate/data/semantic24/conformal_withheld.json",
+  "conformal": {
+    "alpha_trans": 0.05,
+    "alpha_cal": 0.1
+  },
+  "summary": true,
+  "headline_series": {
+    "gt@e5_mistral/cosine_k5": [
+      "OWL-ViT GT \u00b7 Mistral",
+      "#5fd38d"
+    ],
+    "owl@e5_mistral/cosine_k5": [
+      "OWL-ViT raw \u00b7 Mistral",
+      "#ff7ab6"
+    ],
+    "qwen_closed@e5_mistral/cosine_k5": [
+      "Qwen closed \u00b7 Mistral",
+      "#ffd84d"
+    ],
+    "qwen_open@e5_mistral/cosine_k5": [
+      "Qwen open \u00b7 Mistral",
+      "#ff9f43"
+    ],
+    "clip_image/cosine_k5": [
+      "CLIP",
+      "#4d9dff"
+    ],
+    "vision_patch/patch": [
+      "DINOv2 patch",
+      "#ff6b6b"
+    ]
+  }
+}

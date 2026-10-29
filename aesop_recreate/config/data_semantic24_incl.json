@@ -1,0 +1,141 @@
+{
+  "reference_runs": [
+    {
+      "run_name": "t1_nominal_01",
+      "data_path": "aesop_recreate/data/semantic24/t1_nominal_01",
+      "out_path": "aesop_recreate/data/semantic24/t1_nominal_01/embeddings"
+    },
+    {
+      "run_name": "t1_nominal_02",
+      "data_path": "aesop_recreate/data/semantic24/t1_nominal_02",
+      "out_path": "aesop_recreate/data/semantic24/t1_nominal_02/embeddings"
+    },
+    {
+      "run_name": "t1_nominal_03",
+      "data_path": "aesop_recreate/data/semantic24/t1_nominal_03",
+      "out_path": "aesop_recreate/data/semantic24/t1_nominal_03/embeddings"
+    },
+    {
+      "run_name": "t1_nominal_04",
+      "data_path": "aesop_recreate/data/semantic24/t1_nominal_04",
+      "out_path": "aesop_recreate/data/semantic24/t1_nominal_04/embeddings"
+    },
+    {
+      "run_name": "t1_nominal_05",
+      "data_path": "aesop_recreate/data/semantic24/t1_nominal_05",
+      "out_path": "aesop_recreate/data/semantic24/t1_nominal_05/embeddings"
+    },
+    {
+      "run_name": "t1_nominal_06",
+      "data_path": "aesop_recreate/data/semantic24/t1_nominal_06",
+      "out_path": "aesop_recreate/data/semantic24/t1_nominal_06/embeddings"
+    },
+    {
+      "run_name": "t1_nominal_07",
+      "data_path": "aesop_recreate/data/semantic24/t1_nominal_07",
+      "out_path": "aesop_recreate/data/semantic24/t1_nominal_07/embeddings"
+    },
+    {
+      "run_name": "t1_nominal_08",
+      "data_path": "aesop_recreate/data/semantic24/t1_nominal_08",
+      "out_path": "aesop_recreate/data/semantic24/t1_nominal_08/embeddings"
+    },
+    {
+      "run_name": "t1_nominal_09",
+      "data_path": "aesop_recreate/data/semantic24/t1_nominal_09",
+      "out_path": "aesop_recreate/data/semantic24/t1_nominal_09/embeddings"
+    },
+    {
+      "run_name": "t1_nominal_10",
+      "data_path": "aesop_recreate/data/semantic24/t1_nominal_10",
+      "out_path": "aesop_recreate/data/semantic24/t1_nominal_10/embeddings"
+    },
+    {
+      "run_name": "t2_nominal_01",
+      "data_path": "aesop_recreate/data/semantic24/t2_nominal_01",
+      "out_path": "aesop_recreate/data/semantic24/t2_nominal_01/embeddings"
+    },
+    {
+      "run_name": "t2_nominal_02",
+      "data_path": "aesop_recreate/data/semantic24/t2_nominal_02",
+      "out_path": "aesop_recreate/data/semantic24/t2_nominal_02/embeddings"
+    },
+    {
+      "run_name": "t2_nominal_03",
+      "data_path": "aesop_recreate/data/semantic24/t2_nominal_03",
+      "out_path": "aesop_recreate/data/semantic24/t2_nominal_03/embeddings"
+    },
+    {
+      "run_name": "t2_nominal_04",
+      "data_path": "aesop_recreate/data/semantic24/t2_nominal_04",
+      "out_path": "aesop_recreate/data/semantic24/t2_nominal_04/embeddings"
+    },
+    {
+      "run_name": "t2_nominal_05",
+      "data_path": "aesop_recreate/data/semantic24/t2_nominal_05",
+      "out_path": "aesop_recreate/data/semantic24/t2_nominal_05/embeddings"
+    },
+    {
+      "run_name": "t2_nominal_06",
+      "data_path": "aesop_recreate/data/semantic24/t2_nominal_06",
+      "out_path": "aesop_recreate/data/semantic24/t2_nominal_06/embeddings"
+    },
+    {
+      "run_name": "t2_nominal_07",
+      "data_path": "aesop_recreate/data/semantic24/t2_nominal_07",
+      "out_path": "aesop_recreate/data/semantic24/t2_nominal_07/embeddings"
+    },
+    {
+      "run_name": "t2_nominal_08",
+      "data_path": "aesop_recreate/data/semantic24/t2_nominal_08",
+      "out_path": "aesop_recreate/data/semantic24/t2_nominal_08/embeddings"
+    },
+    {
+      "run_name": "t2_nominal_09",
+      "data_path": "aesop_recreate/data/semantic24/t2_nominal_09",
+      "out_path": "aesop_recreate/data/semantic24/t2_nominal_09/embeddings"
+    },
+    {
+      "run_name": "t2_nominal_10",
+      "data_path": "aesop_recreate/data/semantic24/t2_nominal_10",
+      "out_path": "aesop_recreate/data/semantic24/t2_nominal_10/embeddings"
+    }
+  ],
+  "negative_runs": [
+    {
+      "run_name": "t2_test_nominal",
+      "data_path": "aesop_recreate/data/semantic24/t2_test_nominal",
+      "out_path": "aesop_recreate/data/semantic24/t2_test_nominal/embeddings"
+    }
+  ],
+  "anomaly_runs": [
+    {
+      "run_name": "t2_haybale",
+      "data_path": "aesop_recreate/data/semantic24/t2_haybale",
+      "out_path": "aesop_recreate/data/semantic24/t2_haybale/embeddings",
+      "onset_tick": 71,
+      "offset_tick": 102,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "haybale"
+    },
+    {
+      "run_name": "t2_pedestrian",
+      "data_path": "aesop_recreate/data/semantic24/t2_pedestrian",
+      "out_path": "aesop_recreate/data/semantic24/t2_pedestrian/embeddings",
+      "onset_tick": 85,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "pedestrian"
+    },
+    {
+      "run_name": "t2_emergency",
+      "data_path": "aesop_recreate/data/semantic24/t2_emergency",
+      "out_path": "aesop_recreate/data/semantic24/t2_emergency/embeddings",
+      "onset_tick": 190,
+      "offset_tick": 254,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "emergency"
+    }
+  ],
+  "replay_twin": false
+}

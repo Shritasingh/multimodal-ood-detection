@@ -1,0 +1,4 @@
+# on top of ../requirements.txt
+bitsandbytes>=0.50   # 8-bit e5-mistral (Blackwell sm_120 support)
+accelerate>=1.15     # device_map for the quantised model
+scikit-learn         # Ledoit-Wolf covariance for the Mahalanobis score
