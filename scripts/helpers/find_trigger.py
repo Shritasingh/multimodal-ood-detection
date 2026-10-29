@@ -12,7 +12,7 @@ before the ego's route diverges (a turn) or the run ends:
                resolve before any turn) and how centered the candidate is.
 
 Usage:
-    .venv/bin/python scripts/find_trigger.py data/nominal_run/states.jsonl [--mode straight|physics]
+    .venv/bin/python scripts/helpers/find_trigger.py data/nominal_run/states.jsonl [--mode straight|physics]
 """
 from __future__ import annotations
 

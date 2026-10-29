@@ -2,7 +2,7 @@
 run without recollecting. 
 
 Usage:
-    .venv/bin/python scripts/inject_appearance_corruption.py \
+    .venv/bin/python scripts/helpers/inject_appearance_corruption.py \
         --src-run nominal_run --dst-run anomaly_flare \
         --corruption flare --onset-frame 800 --duration 150
 """
@@ -14,7 +14,7 @@ import shutil
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # path to sim/ package (repo root)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # path to sim/ package (repo root)
 from sim.anomalies import VISUAL_CORRUPTIONS, inject_visual
 
 
@@ -31,7 +31,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    data_root = Path(__file__).resolve().parent.parent / "data"
+    data_root = Path(__file__).resolve().parents[2] / "data"
     src_dir = data_root / args.src_run
     dst_dir = data_root / args.dst_run
     (dst_dir / "frames").mkdir(parents=True, exist_ok=True)

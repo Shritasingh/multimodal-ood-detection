@@ -1,8 +1,8 @@
 """Stitches each run's frames/*.jpg into an mp4, saved alongside the frames.
 
 Usage:
-    .venv/bin/python scripts/make_videos.py [run_name ...]
-    .venv/bin/python scripts/make_videos.py --start 600 --end 800 [run_name ...]
+    .venv/bin/python scripts/helpers/make_videos.py [run_name ...]
+    .venv/bin/python scripts/helpers/make_videos.py --start 600 --end 800 [run_name ...]
 
 With no run names, does every directory under data/ that has a frames/
 subfolder. --start/--end clip to a frame index range (inclusive start,
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import cv2
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 FPS = 10  # matches --fixed-delta 0.1 in run_sim.py
 
 

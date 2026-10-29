@@ -1,16 +1,16 @@
 """Builds simulated runs, injects anomalies, and saves frames + ground truth states to /data/<run_name>
 
 Usage (flags):
-    .venv/bin/python scripts/run_sim.py --run-name nominal_run --n-ticks 2000
+    .venv/bin/python scripts/legacy/run_sim.py --run-name nominal_run --n-ticks 2000
 
-    .venv/bin/python scripts/run_sim.py --run-name anomaly_semantic \
+    .venv/bin/python scripts/legacy/run_sim.py --run-name anomaly_semantic \
         --scenario semantic --trigger-tick 600 --n-ticks 1200
 
 Usage (config file -- see config/sim_*.json for one per scenario):
-    .venv/bin/python scripts/run_sim.py --config config/sim_anom_physics.json --seed 11   # -> data/anom_phys_s11
+    .venv/bin/python scripts/legacy/run_sim.py --config config/sim_anom_physics.json --seed 11   # -> data/anom_phys_s11
 
     # flags still override individual values from the config file:
-    .venv/bin/python scripts/run_sim.py --config config/sim_anom_physics.json --run-name my_run_v2
+    .venv/bin/python scripts/legacy/run_sim.py --config config/sim_anom_physics.json --run-name my_run_v2
 
 Config file keys match the flag names with dashes replaced by underscores
 (e.g. --run-name -> "run_name", --n-ticks -> "n_ticks"). run_name may reference other
@@ -25,7 +25,7 @@ import shutil
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # path to sim/ package (repo root)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # path to sim/ package (repo root)
 from encoders.physics_encoder import RolePhysicsEncoder
 from sim import actors, anomalies, placement
 from sim.state_extractor import GroundTruthStateHistory
@@ -114,7 +114,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    out_dir = Path(__file__).resolve().parent.parent / "data" / args.run_name
+    out_dir = Path(__file__).resolve().parents[2] / "data" / args.run_name
     # A re-run with the same --run-name must not leave stale frames behind:
     # states.jsonl is truncated below (open "w"), so old, longer-run frames
     # sitting past a new shorter run's last tick would silently desync from

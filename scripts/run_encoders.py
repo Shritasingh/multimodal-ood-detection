@@ -8,7 +8,7 @@ tracked other agent's) are finite differences and are undefined -- not just
 frame 0 of every run has no physics embedding.
 
 Usage:
-    .venv/bin/python scripts/run_encoders.py [config/encoders_v2.json] [--anomaly-only]
+    .venv/bin/python scripts/run_encoders.py [config/encoders_v2.json] [--anomaly-only] [--runs=run_a,run_b]
 """
 from __future__ import annotations
 
@@ -22,7 +22,9 @@ from tqdm import tqdm
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # optional first CLI arg: a different config file, e.g. config/encoders_qwen.json (run lists come from config/data.json)
-CONFIG_PATH = Path(sys.argv[1]) if len(sys.argv) > 1 else REPO_ROOT / "config" / "encoders.json"
+CONFIG_PATH = Path(sys.argv[1]) if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else REPO_ROOT / "config" / "encoders.json"
+# optional --runs=a,b,c: only encode these eval runs (implies --anomaly-only: the reference pool is left as is)
+ONLY_RUNS = next((set(a.split("=", 1)[1].split(",")) for a in sys.argv if a.startswith("--runs=")), None)
 
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -290,11 +292,13 @@ def main():
     # Qwen and its text embedders load lazily, only when needed
     qwen_params = {**config.get("qwen_encoder_params", {}), "text_embedding": text_cfg}
 
-    if "--anomaly-only" not in sys.argv:
+    if "--anomaly-only" not in sys.argv and ONLY_RUNS is None:
         for ref in config.get("reference_runs") or [config["reference_run"]]:
             encode_run(ref["run_name"], ref["data_path"], ref["out_path"], active_encoders, models, suffix="_nominal", qwen_params=qwen_params, text_cfg=text_cfg)
 
     for run in eval_runs(config):
+        if ONLY_RUNS is not None and run["run_name"] not in ONLY_RUNS:
+            continue
         encode_run(run["run_name"], run["data_path"], run["out_path"], active_encoders, models, suffix="", qwen_params=qwen_params, text_cfg=text_cfg)
 
 

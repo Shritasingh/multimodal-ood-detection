@@ -1,7 +1,7 @@
 """Snaps the spectator to the ego's RGB camera transform every tick.
 
 Usage:
-    .venv/bin/python scripts/follow_ego_cam.py
+    .venv/bin/python scripts/sim_debugging/follow_ego_cam.py
 """
 import time
 import carla

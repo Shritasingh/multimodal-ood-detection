@@ -1,4 +1,4 @@
-"""Compare old (ego z + 0.3) vs bounding-box prop placement against the road: .venv/bin/python scripts/check_prop_ground.py [prop ...] (needs CARLA)."""
+"""Compare old (ego z + 0.3) vs bounding-box prop placement against the road: .venv/bin/python scripts/sim_debugging/check_prop_ground.py [prop ...] (needs CARLA)."""
 from __future__ import annotations
 
 import sys
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import carla
 
 from sim import placement

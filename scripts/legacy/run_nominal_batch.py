@@ -8,7 +8,7 @@ import sys
 import time
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def parse_seeds(text: str) -> list[int]:
@@ -60,7 +60,7 @@ def main():
             continue
         print(f"=== {name} (seed {seed})", flush=True)
         t0 = time.time()
-        cmd = [sys.executable, str(REPO_ROOT / "scripts" / "run_sim.py"), "--config", str(args.config), "--run-name", name, "--seed", str(seed)]
+        cmd = [sys.executable, str(REPO_ROOT / "scripts" / "legacy" / "run_sim.py"), "--config", str(args.config), "--run-name", name, "--seed", str(seed)]
         rc = subprocess.run(cmd).returncode
         problem = f"run_sim exited {rc}" if rc else check_run(name, cfg)
         report.append((name, seed, time.time() - t0, problem or "ok"))

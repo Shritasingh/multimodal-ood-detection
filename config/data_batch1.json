@@ -1,0 +1,1320 @@
+{
+  "reference_runs": [
+    {
+      "run_name": "nominal_001",
+      "data_path": "data/batch1/nominal_001",
+      "out_path": "data/batch1/nominal_001/embeddings"
+    },
+    {
+      "run_name": "nominal_002",
+      "data_path": "data/batch1/nominal_002",
+      "out_path": "data/batch1/nominal_002/embeddings"
+    },
+    {
+      "run_name": "nominal_003",
+      "data_path": "data/batch1/nominal_003",
+      "out_path": "data/batch1/nominal_003/embeddings"
+    },
+    {
+      "run_name": "nominal_004",
+      "data_path": "data/batch1/nominal_004",
+      "out_path": "data/batch1/nominal_004/embeddings"
+    },
+    {
+      "run_name": "nominal_005",
+      "data_path": "data/batch1/nominal_005",
+      "out_path": "data/batch1/nominal_005/embeddings"
+    },
+    {
+      "run_name": "nominal_006",
+      "data_path": "data/batch1/nominal_006",
+      "out_path": "data/batch1/nominal_006/embeddings"
+    },
+    {
+      "run_name": "nominal_007",
+      "data_path": "data/batch1/nominal_007",
+      "out_path": "data/batch1/nominal_007/embeddings"
+    },
+    {
+      "run_name": "nominal_008",
+      "data_path": "data/batch1/nominal_008",
+      "out_path": "data/batch1/nominal_008/embeddings"
+    },
+    {
+      "run_name": "nominal_009",
+      "data_path": "data/batch1/nominal_009",
+      "out_path": "data/batch1/nominal_009/embeddings"
+    },
+    {
+      "run_name": "nominal_010",
+      "data_path": "data/batch1/nominal_010",
+      "out_path": "data/batch1/nominal_010/embeddings"
+    },
+    {
+      "run_name": "nominal_011",
+      "data_path": "data/batch1/nominal_011",
+      "out_path": "data/batch1/nominal_011/embeddings"
+    },
+    {
+      "run_name": "nominal_012",
+      "data_path": "data/batch1/nominal_012",
+      "out_path": "data/batch1/nominal_012/embeddings"
+    },
+    {
+      "run_name": "nominal_013",
+      "data_path": "data/batch1/nominal_013",
+      "out_path": "data/batch1/nominal_013/embeddings"
+    },
+    {
+      "run_name": "nominal_014",
+      "data_path": "data/batch1/nominal_014",
+      "out_path": "data/batch1/nominal_014/embeddings"
+    },
+    {
+      "run_name": "nominal_015",
+      "data_path": "data/batch1/nominal_015",
+      "out_path": "data/batch1/nominal_015/embeddings"
+    },
+    {
+      "run_name": "nominal_016",
+      "data_path": "data/batch1/nominal_016",
+      "out_path": "data/batch1/nominal_016/embeddings"
+    },
+    {
+      "run_name": "nominal_017",
+      "data_path": "data/batch1/nominal_017",
+      "out_path": "data/batch1/nominal_017/embeddings"
+    },
+    {
+      "run_name": "nominal_018",
+      "data_path": "data/batch1/nominal_018",
+      "out_path": "data/batch1/nominal_018/embeddings"
+    },
+    {
+      "run_name": "nominal_019",
+      "data_path": "data/batch1/nominal_019",
+      "out_path": "data/batch1/nominal_019/embeddings"
+    },
+    {
+      "run_name": "nominal_020",
+      "data_path": "data/batch1/nominal_020",
+      "out_path": "data/batch1/nominal_020/embeddings"
+    },
+    {
+      "run_name": "nominal_021",
+      "data_path": "data/batch1/nominal_021",
+      "out_path": "data/batch1/nominal_021/embeddings"
+    },
+    {
+      "run_name": "nominal_022",
+      "data_path": "data/batch1/nominal_022",
+      "out_path": "data/batch1/nominal_022/embeddings"
+    },
+    {
+      "run_name": "nominal_023",
+      "data_path": "data/batch1/nominal_023",
+      "out_path": "data/batch1/nominal_023/embeddings"
+    },
+    {
+      "run_name": "nominal_024",
+      "data_path": "data/batch1/nominal_024",
+      "out_path": "data/batch1/nominal_024/embeddings"
+    },
+    {
+      "run_name": "nominal_025",
+      "data_path": "data/batch1/nominal_025",
+      "out_path": "data/batch1/nominal_025/embeddings"
+    },
+    {
+      "run_name": "nominal_026",
+      "data_path": "data/batch1/nominal_026",
+      "out_path": "data/batch1/nominal_026/embeddings"
+    },
+    {
+      "run_name": "nominal_027",
+      "data_path": "data/batch1/nominal_027",
+      "out_path": "data/batch1/nominal_027/embeddings"
+    },
+    {
+      "run_name": "nominal_028",
+      "data_path": "data/batch1/nominal_028",
+      "out_path": "data/batch1/nominal_028/embeddings"
+    },
+    {
+      "run_name": "nominal_029",
+      "data_path": "data/batch1/nominal_029",
+      "out_path": "data/batch1/nominal_029/embeddings"
+    },
+    {
+      "run_name": "nominal_030",
+      "data_path": "data/batch1/nominal_030",
+      "out_path": "data/batch1/nominal_030/embeddings"
+    },
+    {
+      "run_name": "nominal_031",
+      "data_path": "data/batch1/nominal_031",
+      "out_path": "data/batch1/nominal_031/embeddings"
+    },
+    {
+      "run_name": "nominal_032",
+      "data_path": "data/batch1/nominal_032",
+      "out_path": "data/batch1/nominal_032/embeddings"
+    },
+    {
+      "run_name": "nominal_033",
+      "data_path": "data/batch1/nominal_033",
+      "out_path": "data/batch1/nominal_033/embeddings"
+    },
+    {
+      "run_name": "nominal_034",
+      "data_path": "data/batch1/nominal_034",
+      "out_path": "data/batch1/nominal_034/embeddings"
+    },
+    {
+      "run_name": "nominal_035",
+      "data_path": "data/batch1/nominal_035",
+      "out_path": "data/batch1/nominal_035/embeddings"
+    },
+    {
+      "run_name": "nominal_036",
+      "data_path": "data/batch1/nominal_036",
+      "out_path": "data/batch1/nominal_036/embeddings"
+    },
+    {
+      "run_name": "nominal_037",
+      "data_path": "data/batch1/nominal_037",
+      "out_path": "data/batch1/nominal_037/embeddings"
+    },
+    {
+      "run_name": "nominal_038",
+      "data_path": "data/batch1/nominal_038",
+      "out_path": "data/batch1/nominal_038/embeddings"
+    },
+    {
+      "run_name": "nominal_039",
+      "data_path": "data/batch1/nominal_039",
+      "out_path": "data/batch1/nominal_039/embeddings"
+    },
+    {
+      "run_name": "nominal_040",
+      "data_path": "data/batch1/nominal_040",
+      "out_path": "data/batch1/nominal_040/embeddings"
+    },
+    {
+      "run_name": "nominal_041",
+      "data_path": "data/batch1/nominal_041",
+      "out_path": "data/batch1/nominal_041/embeddings"
+    },
+    {
+      "run_name": "nominal_042",
+      "data_path": "data/batch1/nominal_042",
+      "out_path": "data/batch1/nominal_042/embeddings"
+    },
+    {
+      "run_name": "nominal_043",
+      "data_path": "data/batch1/nominal_043",
+      "out_path": "data/batch1/nominal_043/embeddings"
+    },
+    {
+      "run_name": "nominal_044",
+      "data_path": "data/batch1/nominal_044",
+      "out_path": "data/batch1/nominal_044/embeddings"
+    },
+    {
+      "run_name": "nominal_045",
+      "data_path": "data/batch1/nominal_045",
+      "out_path": "data/batch1/nominal_045/embeddings"
+    },
+    {
+      "run_name": "nominal_046",
+      "data_path": "data/batch1/nominal_046",
+      "out_path": "data/batch1/nominal_046/embeddings"
+    },
+    {
+      "run_name": "nominal_047",
+      "data_path": "data/batch1/nominal_047",
+      "out_path": "data/batch1/nominal_047/embeddings"
+    },
+    {
+      "run_name": "nominal_048",
+      "data_path": "data/batch1/nominal_048",
+      "out_path": "data/batch1/nominal_048/embeddings"
+    },
+    {
+      "run_name": "nominal_049",
+      "data_path": "data/batch1/nominal_049",
+      "out_path": "data/batch1/nominal_049/embeddings"
+    },
+    {
+      "run_name": "nominal_050",
+      "data_path": "data/batch1/nominal_050",
+      "out_path": "data/batch1/nominal_050/embeddings"
+    },
+    {
+      "run_name": "nominal_051",
+      "data_path": "data/batch1/nominal_051",
+      "out_path": "data/batch1/nominal_051/embeddings"
+    },
+    {
+      "run_name": "nominal_052",
+      "data_path": "data/batch1/nominal_052",
+      "out_path": "data/batch1/nominal_052/embeddings"
+    },
+    {
+      "run_name": "nominal_053",
+      "data_path": "data/batch1/nominal_053",
+      "out_path": "data/batch1/nominal_053/embeddings"
+    },
+    {
+      "run_name": "nominal_054",
+      "data_path": "data/batch1/nominal_054",
+      "out_path": "data/batch1/nominal_054/embeddings"
+    },
+    {
+      "run_name": "nominal_055",
+      "data_path": "data/batch1/nominal_055",
+      "out_path": "data/batch1/nominal_055/embeddings"
+    },
+    {
+      "run_name": "nominal_056",
+      "data_path": "data/batch1/nominal_056",
+      "out_path": "data/batch1/nominal_056/embeddings"
+    },
+    {
+      "run_name": "nominal_057",
+      "data_path": "data/batch1/nominal_057",
+      "out_path": "data/batch1/nominal_057/embeddings"
+    },
+    {
+      "run_name": "nominal_058",
+      "data_path": "data/batch1/nominal_058",
+      "out_path": "data/batch1/nominal_058/embeddings"
+    },
+    {
+      "run_name": "nominal_059",
+      "data_path": "data/batch1/nominal_059",
+      "out_path": "data/batch1/nominal_059/embeddings"
+    },
+    {
+      "run_name": "nominal_060",
+      "data_path": "data/batch1/nominal_060",
+      "out_path": "data/batch1/nominal_060/embeddings"
+    }
+  ],
+  "calibration_runs": [
+    {
+      "run_name": "nominal_061",
+      "data_path": "data/batch1/nominal_061",
+      "out_path": "data/batch1/nominal_061/embeddings"
+    },
+    {
+      "run_name": "nominal_062",
+      "data_path": "data/batch1/nominal_062",
+      "out_path": "data/batch1/nominal_062/embeddings"
+    },
+    {
+      "run_name": "nominal_063",
+      "data_path": "data/batch1/nominal_063",
+      "out_path": "data/batch1/nominal_063/embeddings"
+    },
+    {
+      "run_name": "nominal_064",
+      "data_path": "data/batch1/nominal_064",
+      "out_path": "data/batch1/nominal_064/embeddings"
+    },
+    {
+      "run_name": "nominal_065",
+      "data_path": "data/batch1/nominal_065",
+      "out_path": "data/batch1/nominal_065/embeddings"
+    },
+    {
+      "run_name": "nominal_066",
+      "data_path": "data/batch1/nominal_066",
+      "out_path": "data/batch1/nominal_066/embeddings"
+    },
+    {
+      "run_name": "nominal_067",
+      "data_path": "data/batch1/nominal_067",
+      "out_path": "data/batch1/nominal_067/embeddings"
+    },
+    {
+      "run_name": "nominal_068",
+      "data_path": "data/batch1/nominal_068",
+      "out_path": "data/batch1/nominal_068/embeddings"
+    },
+    {
+      "run_name": "nominal_069",
+      "data_path": "data/batch1/nominal_069",
+      "out_path": "data/batch1/nominal_069/embeddings"
+    },
+    {
+      "run_name": "nominal_070",
+      "data_path": "data/batch1/nominal_070",
+      "out_path": "data/batch1/nominal_070/embeddings"
+    },
+    {
+      "run_name": "nominal_071",
+      "data_path": "data/batch1/nominal_071",
+      "out_path": "data/batch1/nominal_071/embeddings"
+    },
+    {
+      "run_name": "nominal_072",
+      "data_path": "data/batch1/nominal_072",
+      "out_path": "data/batch1/nominal_072/embeddings"
+    },
+    {
+      "run_name": "nominal_073",
+      "data_path": "data/batch1/nominal_073",
+      "out_path": "data/batch1/nominal_073/embeddings"
+    },
+    {
+      "run_name": "nominal_074",
+      "data_path": "data/batch1/nominal_074",
+      "out_path": "data/batch1/nominal_074/embeddings"
+    },
+    {
+      "run_name": "nominal_075",
+      "data_path": "data/batch1/nominal_075",
+      "out_path": "data/batch1/nominal_075/embeddings"
+    },
+    {
+      "run_name": "nominal_076",
+      "data_path": "data/batch1/nominal_076",
+      "out_path": "data/batch1/nominal_076/embeddings"
+    },
+    {
+      "run_name": "nominal_077",
+      "data_path": "data/batch1/nominal_077",
+      "out_path": "data/batch1/nominal_077/embeddings"
+    },
+    {
+      "run_name": "nominal_078",
+      "data_path": "data/batch1/nominal_078",
+      "out_path": "data/batch1/nominal_078/embeddings"
+    },
+    {
+      "run_name": "nominal_079",
+      "data_path": "data/batch1/nominal_079",
+      "out_path": "data/batch1/nominal_079/embeddings"
+    },
+    {
+      "run_name": "nominal_080",
+      "data_path": "data/batch1/nominal_080",
+      "out_path": "data/batch1/nominal_080/embeddings"
+    },
+    {
+      "run_name": "nominal_081",
+      "data_path": "data/batch1/nominal_081",
+      "out_path": "data/batch1/nominal_081/embeddings"
+    },
+    {
+      "run_name": "nominal_082",
+      "data_path": "data/batch1/nominal_082",
+      "out_path": "data/batch1/nominal_082/embeddings"
+    },
+    {
+      "run_name": "nominal_083",
+      "data_path": "data/batch1/nominal_083",
+      "out_path": "data/batch1/nominal_083/embeddings"
+    },
+    {
+      "run_name": "nominal_084",
+      "data_path": "data/batch1/nominal_084",
+      "out_path": "data/batch1/nominal_084/embeddings"
+    },
+    {
+      "run_name": "nominal_085",
+      "data_path": "data/batch1/nominal_085",
+      "out_path": "data/batch1/nominal_085/embeddings"
+    },
+    {
+      "run_name": "nominal_086",
+      "data_path": "data/batch1/nominal_086",
+      "out_path": "data/batch1/nominal_086/embeddings"
+    },
+    {
+      "run_name": "nominal_087",
+      "data_path": "data/batch1/nominal_087",
+      "out_path": "data/batch1/nominal_087/embeddings"
+    },
+    {
+      "run_name": "nominal_088",
+      "data_path": "data/batch1/nominal_088",
+      "out_path": "data/batch1/nominal_088/embeddings"
+    },
+    {
+      "run_name": "nominal_089",
+      "data_path": "data/batch1/nominal_089",
+      "out_path": "data/batch1/nominal_089/embeddings"
+    },
+    {
+      "run_name": "nominal_090",
+      "data_path": "data/batch1/nominal_090",
+      "out_path": "data/batch1/nominal_090/embeddings"
+    }
+  ],
+  "negative_runs": [
+    {
+      "run_name": "nominal_091",
+      "data_path": "data/batch1/nominal_091",
+      "out_path": "data/batch1/nominal_091/embeddings"
+    },
+    {
+      "run_name": "nominal_092",
+      "data_path": "data/batch1/nominal_092",
+      "out_path": "data/batch1/nominal_092/embeddings"
+    },
+    {
+      "run_name": "nominal_093",
+      "data_path": "data/batch1/nominal_093",
+      "out_path": "data/batch1/nominal_093/embeddings"
+    },
+    {
+      "run_name": "nominal_094",
+      "data_path": "data/batch1/nominal_094",
+      "out_path": "data/batch1/nominal_094/embeddings"
+    },
+    {
+      "run_name": "nominal_095",
+      "data_path": "data/batch1/nominal_095",
+      "out_path": "data/batch1/nominal_095/embeddings"
+    },
+    {
+      "run_name": "nominal_096",
+      "data_path": "data/batch1/nominal_096",
+      "out_path": "data/batch1/nominal_096/embeddings"
+    },
+    {
+      "run_name": "nominal_097",
+      "data_path": "data/batch1/nominal_097",
+      "out_path": "data/batch1/nominal_097/embeddings"
+    },
+    {
+      "run_name": "nominal_098",
+      "data_path": "data/batch1/nominal_098",
+      "out_path": "data/batch1/nominal_098/embeddings"
+    },
+    {
+      "run_name": "nominal_099",
+      "data_path": "data/batch1/nominal_099",
+      "out_path": "data/batch1/nominal_099/embeddings"
+    },
+    {
+      "run_name": "nominal_100",
+      "data_path": "data/batch1/nominal_100",
+      "out_path": "data/batch1/nominal_100/embeddings"
+    }
+  ],
+  "anomaly_runs": [
+    {
+      "run_name": "physics_101",
+      "data_path": "data/batch1/physics_101",
+      "out_path": "data/batch1/physics_101/embeddings",
+      "onset_tick": 450,
+      "offset_tick": 502,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_swerve"
+    },
+    {
+      "run_name": "physics_102",
+      "data_path": "data/batch1/physics_102",
+      "out_path": "data/batch1/physics_102/embeddings",
+      "onset_tick": 173,
+      "offset_tick": 188,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_brake"
+    },
+    {
+      "run_name": "physics_105",
+      "data_path": "data/batch1/physics_105",
+      "out_path": "data/batch1/physics_105/embeddings",
+      "onset_tick": 472,
+      "offset_tick": 543,
+      "anomaly_type": "physics",
+      "anomaly_kind": "random_swerve"
+    },
+    {
+      "run_name": "physics_106",
+      "data_path": "data/batch1/physics_106",
+      "out_path": "data/batch1/physics_106/embeddings",
+      "onset_tick": 137,
+      "offset_tick": 192,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_swerve"
+    },
+    {
+      "run_name": "physics_107",
+      "data_path": "data/batch1/physics_107",
+      "out_path": "data/batch1/physics_107/embeddings",
+      "onset_tick": 292,
+      "offset_tick": 311,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_brake"
+    },
+    {
+      "run_name": "physics_110",
+      "data_path": "data/batch1/physics_110",
+      "out_path": "data/batch1/physics_110/embeddings",
+      "onset_tick": 148,
+      "offset_tick": 202,
+      "anomaly_type": "physics",
+      "anomaly_kind": "random_swerve"
+    },
+    {
+      "run_name": "physics_111",
+      "data_path": "data/batch1/physics_111",
+      "out_path": "data/batch1/physics_111/embeddings",
+      "onset_tick": 185,
+      "offset_tick": 248,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_swerve"
+    },
+    {
+      "run_name": "physics_112",
+      "data_path": "data/batch1/physics_112",
+      "out_path": "data/batch1/physics_112/embeddings",
+      "onset_tick": 258,
+      "offset_tick": 274,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_brake"
+    },
+    {
+      "run_name": "physics_114",
+      "data_path": "data/batch1/physics_114",
+      "out_path": "data/batch1/physics_114/embeddings",
+      "onset_tick": 459,
+      "offset_tick": 520,
+      "anomaly_type": "physics",
+      "anomaly_kind": "oncoming_drift"
+    },
+    {
+      "run_name": "physics_116",
+      "data_path": "data/batch1/physics_116",
+      "out_path": "data/batch1/physics_116/embeddings",
+      "onset_tick": 189,
+      "offset_tick": 242,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_swerve"
+    },
+    {
+      "run_name": "physics_117",
+      "data_path": "data/batch1/physics_117",
+      "out_path": "data/batch1/physics_117/embeddings",
+      "onset_tick": 247,
+      "offset_tick": 259,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_brake"
+    },
+    {
+      "run_name": "physics_120",
+      "data_path": "data/batch1/physics_120",
+      "out_path": "data/batch1/physics_120/embeddings",
+      "onset_tick": 202,
+      "offset_tick": 273,
+      "anomaly_type": "physics",
+      "anomaly_kind": "random_swerve"
+    },
+    {
+      "run_name": "physics_122",
+      "data_path": "data/batch1/physics_122",
+      "out_path": "data/batch1/physics_122/embeddings",
+      "onset_tick": 111,
+      "offset_tick": 127,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_brake"
+    },
+    {
+      "run_name": "physics_125",
+      "data_path": "data/batch1/physics_125",
+      "out_path": "data/batch1/physics_125/embeddings",
+      "onset_tick": 375,
+      "offset_tick": 431,
+      "anomaly_type": "physics",
+      "anomaly_kind": "random_swerve"
+    },
+    {
+      "run_name": "physics_126",
+      "data_path": "data/batch1/physics_126",
+      "out_path": "data/batch1/physics_126/embeddings",
+      "onset_tick": 484,
+      "offset_tick": 544,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_swerve"
+    },
+    {
+      "run_name": "physics_127",
+      "data_path": "data/batch1/physics_127",
+      "out_path": "data/batch1/physics_127/embeddings",
+      "onset_tick": 163,
+      "offset_tick": 180,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_brake"
+    },
+    {
+      "run_name": "physics_130",
+      "data_path": "data/batch1/physics_130",
+      "out_path": "data/batch1/physics_130/embeddings",
+      "onset_tick": 236,
+      "offset_tick": 302,
+      "anomaly_type": "physics",
+      "anomaly_kind": "random_swerve"
+    },
+    {
+      "run_name": "physics_133",
+      "data_path": "data/batch1/physics_133",
+      "out_path": "data/batch1/physics_133/embeddings",
+      "onset_tick": 240,
+      "offset_tick": 294,
+      "anomaly_type": "physics",
+      "anomaly_kind": "oncoming_drift"
+    },
+    {
+      "run_name": "physics_134",
+      "data_path": "data/batch1/physics_134",
+      "out_path": "data/batch1/physics_134/embeddings",
+      "onset_tick": 320,
+      "offset_tick": 379,
+      "anomaly_type": "physics",
+      "anomaly_kind": "random_swerve"
+    },
+    {
+      "run_name": "physics_143",
+      "data_path": "data/batch1/physics_143",
+      "out_path": "data/batch1/physics_143/embeddings",
+      "onset_tick": 224,
+      "offset_tick": 277,
+      "anomaly_type": "physics",
+      "anomaly_kind": "lead_swerve"
+    },
+    {
+      "run_name": "physics_144",
+      "data_path": "data/batch1/physics_144",
+      "out_path": "data/batch1/physics_144/embeddings",
+      "onset_tick": 297,
+      "offset_tick": 361,
+      "anomaly_type": "physics",
+      "anomaly_kind": "oncoming_drift"
+    },
+    {
+      "run_name": "physics_147",
+      "data_path": "data/batch1/physics_147",
+      "out_path": "data/batch1/physics_147/embeddings",
+      "onset_tick": 136,
+      "offset_tick": 191,
+      "anomaly_type": "physics",
+      "anomaly_kind": "oncoming_drift"
+    },
+    {
+      "run_name": "physics_151",
+      "data_path": "data/batch1/physics_151",
+      "out_path": "data/batch1/physics_151/embeddings",
+      "onset_tick": 393,
+      "offset_tick": 450,
+      "anomaly_type": "physics",
+      "anomaly_kind": "oncoming_drift"
+    },
+    {
+      "run_name": "physics_157",
+      "data_path": "data/batch1/physics_157",
+      "out_path": "data/batch1/physics_157/embeddings",
+      "onset_tick": 100,
+      "offset_tick": 155,
+      "anomaly_type": "physics",
+      "anomaly_kind": "oncoming_drift"
+    },
+    {
+      "run_name": "physics_201",
+      "data_path": "data/batch1/physics_201",
+      "out_path": "data/batch1/physics_201/embeddings",
+      "onset_tick": 365,
+      "offset_tick": 430,
+      "anomaly_type": "physics",
+      "anomaly_kind": "cut_in"
+    },
+    {
+      "run_name": "physics_211",
+      "data_path": "data/batch1/physics_211",
+      "out_path": "data/batch1/physics_211/embeddings",
+      "onset_tick": 94,
+      "offset_tick": 125,
+      "anomaly_type": "physics",
+      "anomaly_kind": "cut_in"
+    },
+    {
+      "run_name": "physics_212",
+      "data_path": "data/batch1/physics_212",
+      "out_path": "data/batch1/physics_212/embeddings",
+      "onset_tick": 314,
+      "offset_tick": 342,
+      "anomaly_type": "physics",
+      "anomaly_kind": "cut_in"
+    },
+    {
+      "run_name": "physics_213",
+      "data_path": "data/batch1/physics_213",
+      "out_path": "data/batch1/physics_213/embeddings",
+      "onset_tick": 97,
+      "offset_tick": 127,
+      "anomaly_type": "physics",
+      "anomaly_kind": "cut_in"
+    },
+    {
+      "run_name": "physics_214",
+      "data_path": "data/batch1/physics_214",
+      "out_path": "data/batch1/physics_214/embeddings",
+      "onset_tick": 104,
+      "offset_tick": 134,
+      "anomaly_type": "physics",
+      "anomaly_kind": "cut_in"
+    },
+    {
+      "run_name": "physics_215",
+      "data_path": "data/batch1/physics_215",
+      "out_path": "data/batch1/physics_215/embeddings",
+      "onset_tick": 112,
+      "offset_tick": 141,
+      "anomaly_type": "physics",
+      "anomaly_kind": "cut_in"
+    },
+    {
+      "run_name": "semantic_001",
+      "data_path": "data/batch1/semantic_001",
+      "out_path": "data/batch1/semantic_001/embeddings",
+      "onset_tick": 235,
+      "offset_tick": 250,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "debris"
+    },
+    {
+      "run_name": "semantic_002",
+      "data_path": "data/batch1/semantic_002",
+      "out_path": "data/batch1/semantic_002/embeddings",
+      "onset_tick": 139,
+      "offset_tick": 172,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "construction"
+    },
+    {
+      "run_name": "semantic_003",
+      "data_path": "data/batch1/semantic_003",
+      "out_path": "data/batch1/semantic_003/embeddings",
+      "onset_tick": 76,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "out_of_place"
+    },
+    {
+      "run_name": "semantic_004",
+      "data_path": "data/batch1/semantic_004",
+      "out_path": "data/batch1/semantic_004/embeddings",
+      "onset_tick": 109,
+      "offset_tick": 137,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "emergency"
+    },
+    {
+      "run_name": "semantic_005",
+      "data_path": "data/batch1/semantic_005",
+      "out_path": "data/batch1/semantic_005/embeddings",
+      "onset_tick": 122,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "crowd"
+    },
+    {
+      "run_name": "semantic_006",
+      "data_path": "data/batch1/semantic_006",
+      "out_path": "data/batch1/semantic_006/embeddings",
+      "onset_tick": 105,
+      "offset_tick": 128,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "debris"
+    },
+    {
+      "run_name": "semantic_007",
+      "data_path": "data/batch1/semantic_007",
+      "out_path": "data/batch1/semantic_007/embeddings",
+      "onset_tick": 231,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "construction"
+    },
+    {
+      "run_name": "semantic_009",
+      "data_path": "data/batch1/semantic_009",
+      "out_path": "data/batch1/semantic_009/embeddings",
+      "onset_tick": 84,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "emergency"
+    },
+    {
+      "run_name": "semantic_011",
+      "data_path": "data/batch1/semantic_011",
+      "out_path": "data/batch1/semantic_011/embeddings",
+      "onset_tick": 145,
+      "offset_tick": 161,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "debris"
+    },
+    {
+      "run_name": "semantic_012",
+      "data_path": "data/batch1/semantic_012",
+      "out_path": "data/batch1/semantic_012/embeddings",
+      "onset_tick": 83,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "construction"
+    },
+    {
+      "run_name": "semantic_013",
+      "data_path": "data/batch1/semantic_013",
+      "out_path": "data/batch1/semantic_013/embeddings",
+      "onset_tick": 114,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "out_of_place"
+    },
+    {
+      "run_name": "semantic_018",
+      "data_path": "data/batch1/semantic_018",
+      "out_path": "data/batch1/semantic_018/embeddings",
+      "onset_tick": 225,
+      "offset_tick": 461,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "out_of_place"
+    },
+    {
+      "run_name": "semantic_020",
+      "data_path": "data/batch1/semantic_020",
+      "out_path": "data/batch1/semantic_020/embeddings",
+      "onset_tick": 68,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "crowd"
+    },
+    {
+      "run_name": "semantic_022",
+      "data_path": "data/batch1/semantic_022",
+      "out_path": "data/batch1/semantic_022/embeddings",
+      "onset_tick": 340,
+      "offset_tick": 409,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "construction"
+    },
+    {
+      "run_name": "semantic_023",
+      "data_path": "data/batch1/semantic_023",
+      "out_path": "data/batch1/semantic_023/embeddings",
+      "onset_tick": 337,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "out_of_place"
+    },
+    {
+      "run_name": "semantic_024",
+      "data_path": "data/batch1/semantic_024",
+      "out_path": "data/batch1/semantic_024/embeddings",
+      "onset_tick": 67,
+      "offset_tick": 86,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "emergency"
+    },
+    {
+      "run_name": "semantic_025",
+      "data_path": "data/batch1/semantic_025",
+      "out_path": "data/batch1/semantic_025/embeddings",
+      "onset_tick": 34,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "crowd"
+    },
+    {
+      "run_name": "semantic_026",
+      "data_path": "data/batch1/semantic_026",
+      "out_path": "data/batch1/semantic_026/embeddings",
+      "onset_tick": 123,
+      "offset_tick": 147,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "debris"
+    },
+    {
+      "run_name": "semantic_027",
+      "data_path": "data/batch1/semantic_027",
+      "out_path": "data/batch1/semantic_027/embeddings",
+      "onset_tick": 118,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "construction"
+    },
+    {
+      "run_name": "semantic_029",
+      "data_path": "data/batch1/semantic_029",
+      "out_path": "data/batch1/semantic_029/embeddings",
+      "onset_tick": 372,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "emergency"
+    },
+    {
+      "run_name": "semantic_031",
+      "data_path": "data/batch1/semantic_031",
+      "out_path": "data/batch1/semantic_031/embeddings",
+      "onset_tick": 101,
+      "offset_tick": 135,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "construction"
+    },
+    {
+      "run_name": "semantic_032",
+      "data_path": "data/batch1/semantic_032",
+      "out_path": "data/batch1/semantic_032/embeddings",
+      "onset_tick": 111,
+      "offset_tick": 126,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "debris"
+    },
+    {
+      "run_name": "semantic_033",
+      "data_path": "data/batch1/semantic_033",
+      "out_path": "data/batch1/semantic_033/embeddings",
+      "onset_tick": 115,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "crowd"
+    },
+    {
+      "run_name": "semantic_034",
+      "data_path": "data/batch1/semantic_034",
+      "out_path": "data/batch1/semantic_034/embeddings",
+      "onset_tick": 92,
+      "offset_tick": 132,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "emergency"
+    },
+    {
+      "run_name": "semantic_035",
+      "data_path": "data/batch1/semantic_035",
+      "out_path": "data/batch1/semantic_035/embeddings",
+      "onset_tick": 67,
+      "offset_tick": 87,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "debris"
+    },
+    {
+      "run_name": "semantic_036",
+      "data_path": "data/batch1/semantic_036",
+      "out_path": "data/batch1/semantic_036/embeddings",
+      "onset_tick": 70,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "out_of_place"
+    },
+    {
+      "run_name": "semantic_039",
+      "data_path": "data/batch1/semantic_039",
+      "out_path": "data/batch1/semantic_039/embeddings",
+      "onset_tick": 15,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "emergency"
+    },
+    {
+      "run_name": "semantic_040",
+      "data_path": "data/batch1/semantic_040",
+      "out_path": "data/batch1/semantic_040/embeddings",
+      "onset_tick": 36,
+      "offset_tick": 600,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "crowd"
+    },
+    {
+      "run_name": "semantic_041",
+      "data_path": "data/batch1/semantic_041",
+      "out_path": "data/batch1/semantic_041/embeddings",
+      "onset_tick": 133,
+      "offset_tick": 189,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "construction"
+    },
+    {
+      "run_name": "semantic_042",
+      "data_path": "data/batch1/semantic_042",
+      "out_path": "data/batch1/semantic_042/embeddings",
+      "onset_tick": 346,
+      "offset_tick": 455,
+      "anomaly_type": "semantic",
+      "anomaly_kind": "out_of_place"
+    },
+    {
+      "run_name": "visual_001",
+      "data_path": "data/batch1/visual_001",
+      "out_path": "data/batch1/visual_001/embeddings",
+      "onset_tick": 274,
+      "offset_tick": 377,
+      "anomaly_type": "visual",
+      "anomaly_kind": "flare"
+    },
+    {
+      "run_name": "visual_002",
+      "data_path": "data/batch1/visual_002",
+      "out_path": "data/batch1/visual_002/embeddings",
+      "onset_tick": 275,
+      "offset_tick": 435,
+      "anomaly_type": "visual",
+      "anomaly_kind": "blur"
+    },
+    {
+      "run_name": "visual_003",
+      "data_path": "data/batch1/visual_003",
+      "out_path": "data/batch1/visual_003/embeddings",
+      "onset_tick": 247,
+      "offset_tick": 419,
+      "anomaly_type": "visual",
+      "anomaly_kind": "brightness"
+    },
+    {
+      "run_name": "visual_004",
+      "data_path": "data/batch1/visual_004",
+      "out_path": "data/batch1/visual_004/embeddings",
+      "onset_tick": 330,
+      "offset_tick": 486,
+      "anomaly_type": "visual",
+      "anomaly_kind": "noise"
+    },
+    {
+      "run_name": "visual_005",
+      "data_path": "data/batch1/visual_005",
+      "out_path": "data/batch1/visual_005/embeddings",
+      "onset_tick": 235,
+      "offset_tick": 341,
+      "anomaly_type": "visual",
+      "anomaly_kind": "dirty_camera"
+    },
+    {
+      "run_name": "visual_006",
+      "data_path": "data/batch1/visual_006",
+      "out_path": "data/batch1/visual_006/embeddings",
+      "onset_tick": 278,
+      "offset_tick": 459,
+      "anomaly_type": "visual",
+      "anomaly_kind": "flare"
+    },
+    {
+      "run_name": "visual_007",
+      "data_path": "data/batch1/visual_007",
+      "out_path": "data/batch1/visual_007/embeddings",
+      "onset_tick": 306,
+      "offset_tick": 411,
+      "anomaly_type": "visual",
+      "anomaly_kind": "blur"
+    },
+    {
+      "run_name": "visual_008",
+      "data_path": "data/batch1/visual_008",
+      "out_path": "data/batch1/visual_008/embeddings",
+      "onset_tick": 298,
+      "offset_tick": 435,
+      "anomaly_type": "visual",
+      "anomaly_kind": "brightness"
+    },
+    {
+      "run_name": "visual_009",
+      "data_path": "data/batch1/visual_009",
+      "out_path": "data/batch1/visual_009/embeddings",
+      "onset_tick": 355,
+      "offset_tick": 467,
+      "anomaly_type": "visual",
+      "anomaly_kind": "noise"
+    },
+    {
+      "run_name": "visual_010",
+      "data_path": "data/batch1/visual_010",
+      "out_path": "data/batch1/visual_010/embeddings",
+      "onset_tick": 261,
+      "offset_tick": 451,
+      "anomaly_type": "visual",
+      "anomaly_kind": "dirty_camera"
+    },
+    {
+      "run_name": "visual_011",
+      "data_path": "data/batch1/visual_011",
+      "out_path": "data/batch1/visual_011/embeddings",
+      "onset_tick": 290,
+      "offset_tick": 468,
+      "anomaly_type": "visual",
+      "anomaly_kind": "flare"
+    },
+    {
+      "run_name": "visual_012",
+      "data_path": "data/batch1/visual_012",
+      "out_path": "data/batch1/visual_012/embeddings",
+      "onset_tick": 237,
+      "offset_tick": 399,
+      "anomaly_type": "visual",
+      "anomaly_kind": "blur"
+    },
+    {
+      "run_name": "visual_013",
+      "data_path": "data/batch1/visual_013",
+      "out_path": "data/batch1/visual_013/embeddings",
+      "onset_tick": 278,
+      "offset_tick": 394,
+      "anomaly_type": "visual",
+      "anomaly_kind": "brightness"
+    },
+    {
+      "run_name": "visual_014",
+      "data_path": "data/batch1/visual_014",
+      "out_path": "data/batch1/visual_014/embeddings",
+      "onset_tick": 228,
+      "offset_tick": 340,
+      "anomaly_type": "visual",
+      "anomaly_kind": "noise"
+    },
+    {
+      "run_name": "visual_015",
+      "data_path": "data/batch1/visual_015",
+      "out_path": "data/batch1/visual_015/embeddings",
+      "onset_tick": 346,
+      "offset_tick": 528,
+      "anomaly_type": "visual",
+      "anomaly_kind": "dirty_camera"
+    },
+    {
+      "run_name": "visual_016",
+      "data_path": "data/batch1/visual_016",
+      "out_path": "data/batch1/visual_016/embeddings",
+      "onset_tick": 285,
+      "offset_tick": 476,
+      "anomaly_type": "visual",
+      "anomaly_kind": "flare"
+    },
+    {
+      "run_name": "visual_017",
+      "data_path": "data/batch1/visual_017",
+      "out_path": "data/batch1/visual_017/embeddings",
+      "onset_tick": 267,
+      "offset_tick": 460,
+      "anomaly_type": "visual",
+      "anomaly_kind": "blur"
+    },
+    {
+      "run_name": "visual_018",
+      "data_path": "data/batch1/visual_018",
+      "out_path": "data/batch1/visual_018/embeddings",
+      "onset_tick": 300,
+      "offset_tick": 423,
+      "anomaly_type": "visual",
+      "anomaly_kind": "brightness"
+    },
+    {
+      "run_name": "visual_019",
+      "data_path": "data/batch1/visual_019",
+      "out_path": "data/batch1/visual_019/embeddings",
+      "onset_tick": 322,
+      "offset_tick": 497,
+      "anomaly_type": "visual",
+      "anomaly_kind": "noise"
+    },
+    {
+      "run_name": "visual_020",
+      "data_path": "data/batch1/visual_020",
+      "out_path": "data/batch1/visual_020/embeddings",
+      "onset_tick": 358,
+      "offset_tick": 467,
+      "anomaly_type": "visual",
+      "anomaly_kind": "dirty_camera"
+    },
+    {
+      "run_name": "visual_021",
+      "data_path": "data/batch1/visual_021",
+      "out_path": "data/batch1/visual_021/embeddings",
+      "onset_tick": 370,
+      "offset_tick": 513,
+      "anomaly_type": "visual",
+      "anomaly_kind": "flare"
+    },
+    {
+      "run_name": "visual_022",
+      "data_path": "data/batch1/visual_022",
+      "out_path": "data/batch1/visual_022/embeddings",
+      "onset_tick": 380,
+      "offset_tick": 570,
+      "anomaly_type": "visual",
+      "anomaly_kind": "blur"
+    },
+    {
+      "run_name": "visual_023",
+      "data_path": "data/batch1/visual_023",
+      "out_path": "data/batch1/visual_023/embeddings",
+      "onset_tick": 239,
+      "offset_tick": 361,
+      "anomaly_type": "visual",
+      "anomaly_kind": "brightness"
+    },
+    {
+      "run_name": "visual_024",
+      "data_path": "data/batch1/visual_024",
+      "out_path": "data/batch1/visual_024/embeddings",
+      "onset_tick": 181,
+      "offset_tick": 352,
+      "anomaly_type": "visual",
+      "anomaly_kind": "noise"
+    },
+    {
+      "run_name": "visual_025",
+      "data_path": "data/batch1/visual_025",
+      "out_path": "data/batch1/visual_025/embeddings",
+      "onset_tick": 366,
+      "offset_tick": 480,
+      "anomaly_type": "visual",
+      "anomaly_kind": "dirty_camera"
+    },
+    {
+      "run_name": "visual_026",
+      "data_path": "data/batch1/visual_026",
+      "out_path": "data/batch1/visual_026/embeddings",
+      "onset_tick": 258,
+      "offset_tick": 425,
+      "anomaly_type": "visual",
+      "anomaly_kind": "flare"
+    },
+    {
+      "run_name": "visual_027",
+      "data_path": "data/batch1/visual_027",
+      "out_path": "data/batch1/visual_027/embeddings",
+      "onset_tick": 225,
+      "offset_tick": 330,
+      "anomaly_type": "visual",
+      "anomaly_kind": "blur"
+    },
+    {
+      "run_name": "visual_028",
+      "data_path": "data/batch1/visual_028",
+      "out_path": "data/batch1/visual_028/embeddings",
+      "onset_tick": 304,
+      "offset_tick": 414,
+      "anomaly_type": "visual",
+      "anomaly_kind": "brightness"
+    },
+    {
+      "run_name": "visual_029",
+      "data_path": "data/batch1/visual_029",
+      "out_path": "data/batch1/visual_029/embeddings",
+      "onset_tick": 354,
+      "offset_tick": 489,
+      "anomaly_type": "visual",
+      "anomaly_kind": "noise"
+    },
+    {
+      "run_name": "visual_030",
+      "data_path": "data/batch1/visual_030",
+      "out_path": "data/batch1/visual_030/embeddings",
+      "onset_tick": 244,
+      "offset_tick": 431,
+      "anomaly_type": "visual",
+      "anomaly_kind": "dirty_camera"
+    }
+  ]
+}

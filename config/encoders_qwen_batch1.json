@@ -1,0 +1,57 @@
+{
+  "data": "config/data_batch1.json",
+  "encoders": {
+    "qwen_labels": {
+      "k": 1,
+      "metric": "cosine",
+      "dedupe_reference": true
+    },
+    "qwen_hidden": {
+      "k": 5,
+      "metrics": [
+        "pca_whiten",
+        "cosine"
+      ],
+      "layer": 18,
+      "pool": "last_prompt",
+      "n_components": 64
+    },
+    "qwen_judge_labels": {
+      "k": 1,
+      "metric": "cosine",
+      "dedupe_reference": true
+    },
+    "qwen_judge_score": {
+      "k": 1,
+      "metric": "raw"
+    }
+  },
+  "qwen_encoder_params": {
+    "layers": [
+      9,
+      18,
+      27,
+      36
+    ],
+    "batch_size": 6,
+    "stride_reference": 20,
+    "stride_eval": 10,
+    "max_new_tokens_labels": 96,
+    "max_new_tokens_judge": 160,
+    "reuse_texts": false
+  },
+  "text_embedding": {
+    "embedders": [
+      "minilm"
+    ]
+  },
+  "output_stem": "scores_qwen_batch1",
+  "calibration_cache": "conformal_calibration_qwen_batch1.npz",
+  "conformal_results": "conformal_qwen_batch1.json",
+  "conformal": {
+    "alpha_trans": 0.05,
+    "alpha_cal": 0.1
+  },
+  "plot": false,
+  "show": false
+}

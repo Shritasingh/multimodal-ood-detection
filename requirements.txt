@@ -10,3 +10,5 @@ scikit-learn
 matplotlib
 timm
 tqdm
+tensorboard
+imageio-ffmpeg

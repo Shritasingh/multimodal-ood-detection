@@ -28,7 +28,9 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 # optional first CLI arg: a different config file, e.g. config/encoders_qwen.json
-CONFIG_PATH = Path(sys.argv[1]) if len(sys.argv) > 1 else REPO_ROOT / "config" / "encoders.json"
+CONFIG_PATH = Path(sys.argv[1]) if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else REPO_ROOT / "config" / "encoders.json"
+# optional --runs=a,b,c: only (re)score these eval runs, e.g. after re-recording some of them
+ONLY_RUNS = next((set(a.split("=", 1)[1].split(",")) for a in sys.argv if a.startswith("--runs=")), None)
 sys.path.insert(0, str(REPO_ROOT))
 
 
@@ -48,8 +50,9 @@ def load_config(path) -> dict:
 
 
 def eval_runs(config: dict) -> list[dict]:
-    """Every run that gets encoded and scored: anomaly runs, then held-out nominal (negative) runs, which have no onset."""
-    return config["anomaly_runs"] + config.get("negative_runs", [])
+    """Every run that gets encoded and scored: anomaly runs, then held-out nominal (negative) runs and nominal
+    calibration runs (run_conformal.py's thresholds), which have no onset."""
+    return config["anomaly_runs"] + config.get("negative_runs", []) + config.get("calibration_runs", [])
 
 
 def load_npz(out_path: str, name: str) -> dict:
@@ -212,15 +215,16 @@ def score_hidden(nominal: dict, query: dict, p: dict, metric: str) -> tuple[list
     return query["ticks"].tolist(), np.partition(d, k - 1, axis=1)[:, :k].mean(1).tolist()
 
 
-def load_patch_bank(out_paths: list[str], name: str):
-    """Stream every reference run's patch tokens into one L2-normalised fp16 bank (GPU if available), one run at a time."""
+def load_patch_bank(out_paths: list[str], name: str, frame_stride: int = 1):
+    """Stream every reference run's patch tokens into one L2-normalised fp16 bank (GPU if available), one run at a time.
+    frame_stride keeps every n-th frame of each run (consecutive frames are near-duplicates), so a large pool fits."""
     import torch
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     dt = torch.float16 if dev == "cuda" else torch.float32
     bank, row = None, 0
     for p in out_paths:
-        e = np.load(resolve_path(p) / f"{name}.npz")["embeddings"]
+        e = np.load(resolve_path(p) / f"{name}.npz")["embeddings"][::frame_stride]
         flat = e.reshape(-1, e.shape[-1])
         if bank is None:
             bank = torch.empty((len(out_paths) * len(flat), flat.shape[1]), dtype=dt, device=dev)
@@ -263,11 +267,11 @@ def score_std_euclidean(nominal: dict, query: dict, k: int) -> tuple[list[int], 
     mu, sd = ref.mean(0), ref.std(0)
     sd[sd < 1e-6] = 1.0
     R, Q = (ref - mu) / sd, (query["embeddings"].astype(np.float64) - mu) / sd
-    scores = []
-    for i in range(len(Q)):
-        d = np.linalg.norm(R - Q[i], axis=1)
-        kk = min(k, len(d))
-        scores.append(float(np.partition(d, kk - 1)[:kk].mean()))
+    r2, kk, scores = (R**2).sum(1), min(k, len(R)), []
+    for i in range(0, len(Q), 256):   # |q - r|^2 = |q|^2 + |r|^2 - 2 q.r, a block of queries at a time
+        q = Q[i : i + 256]
+        d = np.sqrt(np.clip((q**2).sum(1)[:, None] + r2[None] - 2 * q @ R.T, 0, None))
+        scores += np.partition(d, kk - 1, axis=1)[:, :kk].mean(1).tolist()
     return query["ticks"].tolist(), scores
 
 
@@ -398,7 +402,7 @@ def params_from_config(config: dict) -> dict:
 def build_reference(ref_paths: list[str], active_encoders: list[str], params: dict):
     """Pooled nominal data per encoder (patch bank on the GPU, one row per semantic label if configured) plus Mahalanobis inverse covariances."""
     nominal = {
-        name: {"bank": load_patch_bank(ref_paths, f"{name}_nominal")} if name == "vision_patch" else load_reference(ref_paths, f"{name}_nominal")
+        name: {"bank": load_patch_bank(ref_paths, f"{name}_nominal", params[name].get("bank_stride", 1))} if name == "vision_patch" else load_reference(ref_paths, f"{name}_nominal")
         for name in active_encoders
     }
     for name in nominal:
@@ -417,6 +421,34 @@ def series_of(active_encoders: list[str], params: dict) -> list[tuple[str, str, 
     return [(name if len(metrics_of(params[name])) == 1 else f"{name}/{m}", name, m) for name in active_encoders for m in metrics_of(params[name])]
 
 
+def score_run(out_path: str, nominal: dict, inv_cov: dict, active: list[str], series: list, params: dict, suffix: str = "") -> dict:
+    """{series key: (ticks, scores)} for one run's cached <encoder><suffix>.npz files against the nominal pool."""
+    scores: dict[str, tuple[list[int], list[float]]] = {}
+    queries = {name: load_npz(out_path, f"{name}{suffix}") for name in active}
+    for key, name, metric in series:
+        ticks, vals = score_encoder(name, nominal[name], queries[name], params[name], metric, inv_cov.get(name))
+        scores[key] = (ticks, vals)
+        print(f"  {key}: {len(ticks)} scored ticks ({metric or 'patch-cosine'}, k={params[name]['k']})")
+    return scores
+
+
+def write_scores_csv(csv_path: Path, series: list, scores: dict) -> None:
+    """One row per tick any encoder scored (physics skips the first window-1 ticks, semantic zero-detection ticks,
+    Qwen is strided), one column per series, empty where a series has no score."""
+    all_ticks = sorted(set().union(*(set(t) for t, _ in scores.values())))
+    by_tick = {name: dict(zip(ticks, vals)) for name, (ticks, vals) in scores.items()}
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["tick"] + [key for key, _, _ in series])
+        for t in all_ticks:
+            row = [t]
+            for key, _, _ in series:
+                v = by_tick[key].get(t, float("nan"))
+                row.append("" if np.isnan(v) else round(v, 6))
+            writer.writerow(row)
+    print(f"  wrote {csv_path}")
+
+
 def main():
     config = load_config(CONFIG_PATH)
     active = active_encoders(config)
@@ -427,37 +459,12 @@ def main():
     series = series_of(active, params)
 
     for run in eval_runs(config):
+        if ONLY_RUNS is not None and run["run_name"] not in ONLY_RUNS:
+            continue
         print(f"=== {run['run_name']} ===")
         out_path = resolve_path(run["out_path"])
-        scores: dict[str, tuple[list[int], list[float]]] = {}
-
-        queries = {name: load_npz(run["out_path"], name) for name in active}
-        for key, name, metric in series:
-            ticks, vals = score_encoder(name, nominal[name], queries[name], params[name], metric, inv_cov.get(name))
-            scores[key] = (ticks, vals)
-            print(f"  {key}: {len(ticks)} scored ticks ({metric or 'patch-cosine'}, k={params[name]['k']})")
-
-        # union of all ticks any encoder scored, so the CSV has one row per
-        # tick even though encoders can cover different tick ranges/subsets
-        # (physics skips tick 0, physics_roles the first window-1 ticks, semantic skips zero-detection ticks)
-        all_ticks = sorted(set().union(*(set(t) for t, _ in scores.values())))
-        by_tick = {
-            name: dict(zip(ticks, vals))
-            for name, (ticks, vals) in scores.items()
-        }
-
-        csv_path = out_path / f"{stem}.csv"
-        with open(csv_path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["tick"] + [key for key, _, _ in series])
-            for t in all_ticks:
-                row = [t]
-                for key, _, _ in series:
-                    v = by_tick[key].get(t, float("nan"))
-                    row.append("" if np.isnan(v) else round(v, 6))
-                writer.writerow(row)
-        print(f"  wrote {csv_path}")
-
+        scores = score_run(run["out_path"], nominal, inv_cov, active, series, params)
+        write_scores_csv(out_path / f"{stem}.csv", series, scores)
         if config.get("plot", False) or config.get("show", False):
             plot_run(
                 run["run_name"], out_path, scores, config.get("show", False),

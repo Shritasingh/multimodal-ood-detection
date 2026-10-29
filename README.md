@@ -10,6 +10,7 @@ Implements a *mixture of representations* (vision / semantic / physics) to catch
 encoders/       the three encoders + OOD scorer
 sim/            actor setup, anomaly injection, ground-truth state extractor
 scripts/        data collection, anomaly injection, run encoders
+analysis/       dashboard: overlay videos, per-panel visualisations, TensorBoard export, local server
 config/         sim_*.json scenario presets, data.json runs, encoders*.json encoder settings
 data/           collected runs 
 ```
@@ -62,15 +63,15 @@ conda activate multim_ood
 ../carla_sim/launch_carla.sh &   # start the simulator if it's not already running
 
 # one command per scenario, via a config file (config/sim_*.json); run names are templated on the seed
-python scripts/run_sim.py --config config/sim_nominal.json --seed 3          # -> data/nominal_seed03
-python scripts/run_sim.py --config config/sim_anom_semantic.json --seed 11   # -> data/anom_sem_s11
-python scripts/run_sim.py --config config/sim_anom_physics.json --seed 11    # -> data/anom_phys_s11
-python scripts/run_sim.py --config config/sim_anom_visual.json --seed 11     # -> data/anom_flare_s11
+python scripts/legacy/run_sim.py --config config/sim_nominal.json --seed 3          # -> data/nominal_seed03
+python scripts/legacy/run_sim.py --config config/sim_anom_semantic.json --seed 11   # -> data/anom_sem_s11
+python scripts/legacy/run_sim.py --config config/sim_anom_physics.json --seed 11    # -> data/anom_phys_s11
+python scripts/legacy/run_sim.py --config config/sim_anom_visual.json --seed 11     # -> data/anom_flare_s11
 # flags override individual config values, e.g.:
-python scripts/run_sim.py --config config/sim_anom_physics.json --run-name physics_run_v2 --seed 1
+python scripts/legacy/run_sim.py --config config/sim_anom_physics.json --run-name physics_run_v2 --seed 1
 
 # create visual-anomaly variant from an existing nominal run, without recollecting
-python scripts/inject_appearance_corruption.py --src-run nominal_run --dst-run anomaly_blur --corruption blur --onset-frame 800 --duration 150
+python scripts/helpers/inject_appearance_corruption.py --src-run nominal_run --dst-run anomaly_blur --corruption blur --onset-frame 800 --duration 150
 
 # encode + score every run in config/data.json with the encoders in config/encoders.json
 # (no CLI flags -- edit data.json for runs/out paths, encoders.json for encoders/k/metric)
@@ -86,12 +87,12 @@ python scripts/run_metrics.py    # cheap: scores the cached embeddings via kNN d
 ### Nominal seeds, patch vision, role physics
 
 ```bash
-python scripts/run_nominal_batch.py                          # nominal seeds 1-10 -> data/nominal_seedNN (needs CARLA)
+python scripts/legacy/run_nominal_batch.py                          # nominal seeds 1-10 -> data/nominal_seedNN (needs CARLA)
 python scripts/run_encoders.py                              # vision_patch + physics_roles + semantic (top-n labels)
 python scripts/run_metrics.py                               # scores anomaly + negative runs against the pooled seeds
 python scripts/run_conformal.py                             # conformal thresholds; FPR/AUROC vs data.json's negative run
 python scripts/run_encoders.py config/encoders_qwen.json    # Qwen3-VL encoders (same runs, same scoring)
-python scripts/run_sim.py --config config/sim_anom_semantic.json --seed 3   # anomaly replay of seed 3
+python scripts/legacy/run_sim.py --config config/sim_anom_semantic.json --seed 3   # anomaly replay of seed 3
 ```
 
 Configs: `config/data.json` holds the runs (`reference_runs` = nominal pool, `anomaly_runs` with onset/offset ticks,
@@ -103,7 +104,70 @@ Configs: `config/data.json` holds the runs (`reference_runs` = nominal pool, `an
 `semantic` keeps the `top_n` labels whose best-box score reaches `min_score` (`semantic_encoder_params`, default 5 and 0.025).
 `run_sim.py` starts the prop at the first try from `--trigger-tick` where the ego is not at an intersection and no agent is
 within 10 m ahead (retrying every 10 s), and the swerve when the encoder's lead role is a background vehicle in the ego lane.
-`analysis/` holds diagnostics; `scripts/check_prop_ground.py` checks prop heights.
+`scripts/sim_debugging/check_prop_ground.py` checks prop heights.
+
+### Randomised batches (`batch1`)
+
+`sim/scenarios.py` samples every run from its seed: town (Town01-05, Town10HD), weather (11 day/dusk presets), 40-80
+vehicles, 20-60 pedestrians, the ego's spawn point and a random route the Traffic Manager follows, and (60% of runs,
+nominal and anomalous alike) a lead vehicle that shares the ego's route from the first tick. Nothing is spawned mid-run:
+
+| Type | Kinds | How |
+|---|---|---|
+| semantic | `debris`, `construction`, `out_of_place`, `emergency` (fire truck / ambulance / police), `crowd` | placed on the route 45-110 m ahead before tick 0; the window is when they are on screen (instance segmentation, >= 1000 px) |
+| physics | `lead_swerve`, `lead_brake`, `cut_in`, `oncoming_drift`, `random_swerve` | an agent driving since tick 0 is taken over at a random tick (200-400) if it is clearly visible; falls back to any available kind after 10 s |
+| visual | `flare`, `blur`, `brightness`, `noise`, `dirty_camera` | applied to the recorded frames over a random window |
+
+A run whose anomaly does not happen is marked `success: false` and dropped. Emergency vehicles never appear in
+background traffic.
+
+```bash
+python scripts/run_scenario.py semantic 3 --subtype crowd --out-root data/proto   # one run, for trying things out
+python scripts/helpers/inspect_scenario.py data/proto/*                                     # what each run sampled, did the anomaly happen
+python scripts/run_batch.py          # 100 nominal + 30 semantic + 30 physics tries + 30 visual -> data/batch1, config/data_batch1.json
+python scripts/run_encoders.py config/encoders_batch1.json
+python scripts/run_encoders.py config/encoders_qwen_batch1.json
+python scripts/run_metrics.py config/encoders_batch1.json && python scripts/run_metrics.py config/encoders_qwen_batch1.json
+python scripts/run_conformal.py config/encoders_batch1.json && python scripts/run_conformal.py config/encoders_qwen_batch1.json
+```
+
+`config/data_batch1.json` splits the nominal runs into `reference_runs` (60, the kNN pool), `calibration_runs` (30,
+split conformal: scored against the pool once instead of leave-one-run-out) and `negative_runs` (10, held-out false
+alarms). `run_conformal.py` then reports the run-level detection rate per anomaly type and kind. The Traffic Manager
+uses port 8100, so it does not collide with the dashboard on 8000.
+
+### Dashboard (`analysis/`)
+
+Visualises the scored runs; run after `run_encoders.py`, `run_metrics.py` and `run_conformal.py` on both configs.
+
+```bash
+python analysis/overlay_videos.py --webm --stills 5   # per run: dashboard video + panel stills (computes and caches heatmaps / boxes)
+python analysis/tensorboard_export.py                 # TensorBoard log: scalars, panels, histograms, text, projector
+python analysis/serve.py                              # http://127.0.0.1:8000 (Videos / Images / Scores) + TensorBoard on :6006
+```
+
+One script per panel; each also runs alone and writes its stills to `data/dashboard/<run>/<panel>/`:
+
+| Script | Panel | Source |
+|---|---|---|
+| `vision_heatmaps.py` | DINOv2 per-patch distance over the camera frame | `vision_patch.npz` vs the nominal patch bank, cached in `vision_patch_maps.npz` |
+| `owlvit_boxes.py` | OWL-ViT boxes, labels, scores | OWL-ViT re-run with `semantic_encoder_params`, cached in `semantic_boxes.json` |
+| `physics_topdown.py` | top-down ego-frame view: velocity arrows, 2 s trails, role slots | `states.jsonl` |
+| `qwen_responses.py` | Qwen labels (new vs nominal pool) and judge answer; `--print TICK` for text | `qwen_texts.jsonl`, `qwen_labels.npz` |
+| `score_plots.py` | scores / τ per anomaly type (`SERIES` picks the plotted columns) | score csvs + conformal thresholds |
+
+`common.py` holds run loading and drawing helpers; `dashboard.html` is the page `serve.py` serves.
+
+**Static copy (GitHub Pages).** `analysis/export_static.py --out <dir>` writes the dashboard as static files: scores and
+summaries as JSON, the overlay videos re-encoded to 720p H.264, stills every 10 ticks (no TensorBoard). The published
+copy lives on the orphan `gh-pages` branch, checked out as a worktree at `../mmood-pages`:
+
+```bash
+python analysis/export_static.py --out ../mmood-pages      # re-export after re-scoring or new showcase videos
+cd ../mmood-pages && git add -A && git commit -m "Update dashboard" && git push
+```
+
+Live at https://shritasingh.github.io/multimodal-ood-detection/ (public).
 
 ### CLI reference
 

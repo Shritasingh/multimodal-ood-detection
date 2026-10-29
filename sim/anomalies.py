@@ -1,4 +1,4 @@
-"""One function per injectable anomaly type, so `scripts/run_sim.py` can
+"""One function per injectable anomaly type, so `scripts/legacy/run_sim.py` can
 dispatch on `--scenario` without branching on implementation details.
 """
 from __future__ import annotations

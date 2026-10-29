@@ -100,6 +100,11 @@
       "run_name": "nominal_seed11",
       "data_path": "data/nominal_seed11",
       "out_path": "data/nominal_seed11/embeddings"
+    },
+    {
+      "run_name": "nominal_seed12",
+      "data_path": "data/nominal_seed12",
+      "out_path": "data/nominal_seed12/embeddings"
     }
   ]
 }
