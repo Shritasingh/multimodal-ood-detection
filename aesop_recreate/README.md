@@ -12,18 +12,21 @@ The code reuses `multimodal-ood-detection` (the parent repo): `sim/` and `encode
 
 | | |
 |---|---|
-| Towns | Town01 (nominal pool), Town02 (test), ClearNoon, 600 ticks at 10 Hz |
-| Runs | 20 Town01 nominal, 10 Town02 nominal, 4 Town02 test: nominal, hay bales, pedestrian, emergency |
+| Towns | Town01 (nominal pool), Town02 (test), ClearNoon, 10 Hz; pool runs 600 ticks, test runs 7200 ticks (12 min) |
+| Runs | 20 Town01 nominal, 10 Town02 nominal, 4 long Town02 test runs: nominal, and hay bales / pedestrian / emergency injected 10 times each (one at a time, placed ahead of the ego, removed once passed), as in Elhafsi et al. 2023 |
 | Objects (39) | vehicles, people, traffic control, street furniture (trash can, garbage bag, recycling bin, mailbox, bus stop are also placed along every route), barriers, built / nature, and the anomaly words hay bale, ambulance, police car, warning sign |
 | Predicates (5) | on the road, on the sidewalk, at the intersection, beside the road, in the sky |
-| Anomalies | new object: 2-3 hay bales on the right sidewalk · new predicate: a pedestrian standing in the ego lane · new concept: ambulance + police car with lights at the kerb and an "accident ahead" sign |
+| Anomalies | new object: 2-3 hay bales on the right sidewalk · new predicate: a pedestrian stepping into the ego lane · new concept: ambulance + police car with lights at the kerb and an "accident ahead" sign |
+| Walkers | never jaywalk (cross factor 0); in Town02 a walker about to step onto a road lane (a crosswalk) is stopped at the kerb, so nominal Town02 runs have no person on the road |
 | Pools | **withheld routes** (`semantic_runs_24`): the 20 Town01 runs · **included routes** (`semantic_runs_24_incl`): Town01 01-10 + the 10 Town02 nominal runs; the same 4 test runs |
 
 Concept sources: ground truth (instance segmentation + depth + the OpenDRIVE lanes, hand-correctable), OWL-ViT over all
-object x predicate phrases (each box's best concept, score >= 0.05, at most 15), Qwen3-VL with the closed vocabulary,
+object x predicate phrases (each box's best concept, class-agnostic NMS at IoU 0.5, score >= 0.05, at most 15 concepts), Qwen3-VL with the closed vocabulary,
 Qwen3-VL open vocabulary. Text embedders: e5-mistral-7b-instruct (8-bit), MiniLM, MPNet, BERT-large. End-to-end
 baselines: CLIP image embeddings, DINOv2 patch tokens. Scores: kNN cosine (k = 1, 3, 5, 10) and Mahalanobis to the
-nominal mean; run-level conformal thresholds (leave-one-run-out over the pool).
+nominal mean; run-level conformal thresholds (leave-one-run-out over the pool). Scored as Elhafsi et al. / AESOP: each
+injection's on-screen window is one anomaly (detected if any of its frames is flagged), every other frame one nominal
+observation; accuracy = (TPR + TNR) / 2 (`scripts/evaluate_semantic24.py`).
 
 The assessment compares three groups, each in both pools: **OWL-ViT** concepts (ground truth / raw detections) x the
 four text embedders, **Qwen** concepts (closed / open vocabulary) x the four text embedders, and the **end-to-end**

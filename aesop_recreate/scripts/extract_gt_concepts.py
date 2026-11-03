@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent      # aesop_recreate/
 sys.path[:0] = [str(ROOT), str(ROOT.parent)]       # sim/ merges with multimodal-ood-detection's
 from sim import concepts as K  # noqa: E402
 
-OUT = ROOT / "data" / "semantic24"
+OUT = ROOT / "data" / "semantic24_long"
 
 
 def extract(run_dir: Path) -> str:

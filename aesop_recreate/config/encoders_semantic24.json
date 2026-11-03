@@ -167,7 +167,6 @@
     "alpha_trans": 0.05,
     "alpha_cal": 0.1
   },
-  "summary": true,
   "headline_series": {
     "gt@e5_mistral/cosine_k5": [
       "OWL-ViT GT \u00b7 Mistral",

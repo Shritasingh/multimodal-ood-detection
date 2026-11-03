@@ -113,8 +113,8 @@
       "run_name": "t2_haybale",
       "data_path": "aesop_recreate/data/semantic24/t2_haybale",
       "out_path": "aesop_recreate/data/semantic24/t2_haybale/embeddings",
-      "onset_tick": 71,
-      "offset_tick": 102,
+      "onset_tick": 0,
+      "offset_tick": 359,
       "anomaly_type": "semantic",
       "anomaly_kind": "haybale"
     },
@@ -122,8 +122,8 @@
       "run_name": "t2_pedestrian",
       "data_path": "aesop_recreate/data/semantic24/t2_pedestrian",
       "out_path": "aesop_recreate/data/semantic24/t2_pedestrian/embeddings",
-      "onset_tick": 85,
-      "offset_tick": 600,
+      "onset_tick": 248,
+      "offset_tick": 360,
       "anomaly_type": "semantic",
       "anomaly_kind": "pedestrian"
     },
@@ -131,8 +131,8 @@
       "run_name": "t2_emergency",
       "data_path": "aesop_recreate/data/semantic24/t2_emergency",
       "out_path": "aesop_recreate/data/semantic24/t2_emergency/embeddings",
-      "onset_tick": 190,
-      "offset_tick": 254,
+      "onset_tick": 341,
+      "offset_tick": 600,
       "anomaly_type": "semantic",
       "anomaly_kind": "emergency"
     }

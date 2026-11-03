@@ -10,7 +10,9 @@ id), the depth image and the camera pose: every instance with >= MIN_PX pixels g
   predicate  from the lane under the instance's ground-contact point (its bottom pixels, back-projected with depth):
              driving lane in a junction -> at the intersection, other road lanes -> on the road, sidewalk -> on the
              sidewalk, anything else / off the map -> beside the road. Scenery (SCENERY) is always beside the road;
-             furniture, poles and signs in the kerb-side shoulder lane are on the sidewalk.
+             a vehicle (VEHICLES) off the road lanes is on the road within VEHICLE_ROAD_M of one, else beside it;
+             anything but a vehicle in the kerb-side shoulder lane (Town02's is 0.3 m, the kerb line) is on the sidewalk:
+             furniture, poles, signs and people standing at the kerb.
              Nothing in Town01/02 is "in the sky".
 Instances no rule names keep object None ("unlabeled"); the Labels tab shows them so they can be named by hand.
 Hand corrections live in data/semantic24/gt_overrides.json and are applied by effective_concepts(). Qwen's ground truth
@@ -26,7 +28,7 @@ import numpy as np
 
 OBJECT_FAMILIES = {
     "vehicles": ["car", "van", "truck", "bus", "motorcycle", "bicycle"],
-    "people": ["pedestrian", "cyclist"],
+    "people": ["pedestrian", "cyclist", "man", "woman", "person"],
     "traffic control": ["traffic light", "speed limit sign", "pole", "street lamp"],
     "street furniture": ["trash can", "garbage bag", "recycling bin", "mailbox", "bus stop", "cardboard box", "bench", "plant pot",
                          "fire hydrant", "billboard", "kiosk", "bike rack", "chair", "table", "umbrella"],
@@ -82,7 +84,7 @@ TAGS = {0: "none", 1: "roads", 2: "sidewalks", 3: "buildings", 4: "walls", 5: "f
         24: "road lines", 25: "ground", 26: "bridge", 27: "rail track", 28: "guard rail"}
 SURFACE_TAGS = {0, 1, 2, 11, 24, 25, 27}   # locations, not objects
 TAG_OBJECT = {3: "building", 4: "wall", 5: "fence", 6: "pole", 7: "traffic light", 8: "speed limit sign", 9: "tree", 10: "grass",
-              12: "pedestrian", 13: "cyclist", 14: "car", 15: "truck", 16: "bus", 18: "motorcycle", 19: "bicycle", 23: "water",
+              12: "person", 13: "cyclist", 14: "car", 15: "truck", 16: "bus", 18: "motorcycle", 19: "bicycle", 23: "water",
               26: "bridge", 28: "guard rail"}
 ENV_TAGS = {6, 20, 21, 22}   # tags whose object is better named by the town's environment-object name
 # environment-object name fragment (lower case) -> object; first match wins
@@ -96,8 +98,10 @@ ENV_NAME_OBJECT = [("citylamp", "street lamp"), ("artificiallight", "street lamp
                    ("streetcounter", "kiosk"), ("bikeparking", "bike rack")]
 # scenery: always "beside the road" (where its base meets a sidewalk polygon is arbitrary); everything else is placed by the map
 SCENERY = {"building", "wall", "fence", "tree", "grass", "water", "bridge", "guard rail"}
-# things that move on the road; anything else standing in the narrow kerb-side Shoulder lane is on the sidewalk's edge
-MOVERS = set(OBJECT_FAMILIES["vehicles"] + OBJECT_FAMILIES["people"]) | {"ambulance", "police car"}
+# a vehicle whose ground point is off the road lanes (wheels hidden, cut off by the frame, parked on the kerb, or in a car
+# park / driveway) is on the road if that point is within VEHICLE_ROAD_M of a driving lane's edge, else beside the road
+VEHICLES = set(OBJECT_FAMILIES["vehicles"]) | {"ambulance", "police car"}
+VEHICLE_ROAD_M = 3.0
 
 MIN_PX = 250           # pixels for an instance to count as visible (about 16 x 16 of the 800 x 600 frame)
 ENV_MATCH_M = 1.0      # how far outside an environment object's box its instance point may fall
@@ -110,7 +114,7 @@ def actor_object(type_id: str, base_type: str = "") -> str | None:
     if type_id in PROP_OBJECT:
         return PROP_OBJECT[type_id]
     if type_id.startswith("walker."):
-        return "pedestrian"
+        return "person"
     if type_id.startswith("vehicle."):
         return VEHICLE_BASE.get(base_type.lower(), "car")
     return None
@@ -148,6 +152,22 @@ def backproject(u: np.ndarray, v: np.ndarray, depth: np.ndarray, cam: dict, fov:
     return local @ rotation_matrix(cam["pitch"], cam["yaw"], cam["roll"]).T + np.array([cam["x"], cam["y"], cam["z"]])
 
 
+ROAD_LANES = ("Driving", "Bidirectional", "Shoulder", "Parking", "Biking", "Stop")
+
+
+def vehicle_predicate(cmap, x: float, y: float, z: float) -> str:
+    """Predicate of a vehicle whose ground point is off the road lanes: from the nearest driving lane, by distance."""
+    import carla
+
+    wp = cmap.get_waypoint(carla.Location(x, y, z), project_to_road=True, lane_type=carla.LaneType.Driving)
+    if wp is None:
+        return "beside the road"
+    gap = math.hypot(x - wp.transform.location.x, y - wp.transform.location.y) - wp.lane_width / 2
+    if gap > VEHICLE_ROAD_M:
+        return "beside the road"
+    return "at the intersection" if wp.is_junction else "on the road"
+
+
 def predicate_at(cmap, x: float, y: float, z: float) -> tuple[str, str]:
     """(predicate, lane type) of a world point from the map's lanes."""
     import carla
@@ -156,7 +176,7 @@ def predicate_at(cmap, x: float, y: float, z: float) -> tuple[str, str]:
     if wp is None:
         return "beside the road", "none"
     lt = str(wp.lane_type)
-    if lt in ("Driving", "Bidirectional", "Shoulder", "Parking", "Biking", "Stop"):
+    if lt in ROAD_LANES:
         return ("at the intersection" if wp.is_junction else "on the road"), lt
     if lt == "Sidewalk":
         return "on the sidewalk", lt
@@ -224,7 +244,9 @@ def frame_instances(inst_bgra: np.ndarray, depth: np.ndarray, cam: dict, fov: fl
             rec["object"], rec["src"] = TAG_OBJECT.get(t), f"tag:{rec['tag']}"
         if rec["object"] in SCENERY:
             rec["predicate"] = "beside the road"
-        elif lane == "Shoulder" and rec["object"] and rec["object"] not in MOVERS:
+        elif rec["object"] in VEHICLES and lane not in ROAD_LANES:
+            rec["predicate"] = vehicle_predicate(cmap, *ground)
+        elif lane == "Shoulder" and rec["object"] and rec["object"] not in VEHICLES:   # at the kerb: on the sidewalk's edge
             rec["predicate"] = "on the sidewalk"
         out.append(rec)
     return out

@@ -29,7 +29,7 @@ from encoders.end_to_end_encoders import END_TO_END_ENCODERS  # noqa: E402
 from encoders.text_embedders import TEXT_EMBEDDERS  # noqa: E402
 from sim import concepts as K, semantic24 as P  # noqa: E402
 
-OUT = ROOT / "data" / "semantic24"
+OUT = ROOT / "data" / "semantic24_long"
 SOURCES = ("gt", "owl", "qwen_closed", "qwen_open")
 
 
