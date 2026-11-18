@@ -130,7 +130,11 @@ const objectOf = c => c.split(" ").slice(0, c.startsWith("traffic") ? 2 : 1).joi
 const matchCls = (c, ref) => ref.has(c) ? "green" : [...ref].some(r => objectOf(r) === objectOf(c)) ? "amber" : "red";
 const KEY = `<span style="color:var(--green)">green</span> = same concept, <span style="color:var(--amber)">amber</span> = same object, other predicate, <span style="color:var(--alert)">red</span> = not in this frame`;
 
+// served by serve.py, or exported as static files by export_static.py (window.STATIC_SITE)
+const STATIC = !!window.STATIC_SITE;
+const ROOT = STATIC ? "" : "/";
 async function getJSON(url) {
+  if (STATIC) url = url === "/api/index" ? "api/index.json" : `${url.slice(1)}.json`;
   const r = await fetch(url), j = await r.json();
   if (!r.ok) { $("banner").hidden = false; $("banner").textContent = j.error || `error ${r.status}`; throw new Error(j.error); }
   $("banner").hidden = true;
@@ -203,7 +207,7 @@ function draw() {
   $("fr").innerHTML = `#${d.pos} · ${d.dir}/${pad(d.idx)} · ${d.rec.plan.note}${d.rec.shift ? ` · <span class="alert">ANOMALY</span>` : ""}`;
   drawLabels(); drawScoreChips(); drawKnn(); drawPlot();
   drawTopdown($("topdown"), d.rec, d.slot, false);
-  const src = `/data/${S.cache}/${d.dir}/frames/${pad(d.idx)}.jpg?v=${S.index.version}`;
+  const src = `${ROOT}data/${S.cache}/${d.dir}/frames/${pad(d.idx)}.jpg?v=${S.index.version}`;
   if (!S.img.src.endsWith(src)) { S.img.onload = drawCanvas; S.img.src = src; } else drawCanvas();
   saveHash();
 }
@@ -320,7 +324,7 @@ function drawKnn() {
   $("knn-h").innerHTML = `<span style="color:${colour(r)}">${r}</span> · ${METRIC[r]} · ${what}${S.group === "nominal" ? " · this frame left out" : ""}${pairsKey} · chips: ${KEY}`;
   $("knn-list").innerHTML = rows.map((n, j) => `<div class="nb" data-p="${n.pos}">
       <div class="hd"><b ${n.pairs ? `style="color:${PAIR_COL[j % PAIR_COL.length]}"` : ""}>${j + 1}</b><span>nominal #${n.pos}</span><span class="dim">${n.patches != null ? `${n.patches} of ${S.index.knn_patches} patches · ` : ""}${n.same > 1 ? `shared by ${n.same} nominal frames · ` : ""}distance ${f3(n.d)}${n.d === 0 ? " · identical" : ""} · its own scores: ${S.index.reps.map(q => `<span style="color:${colour(q)}">${SHORT[q] ?? q[0]}</span> ${f3(n.s[q])}`).join(" ")}</span></div>
-      <div class="pics"><div style="position:relative"><img loading="lazy" src="/data/${S.cache}/nominal/frames/${pad(n.idx)}.jpg?v=${S.index.version}">${pairSvg(n, j)}</div><canvas id="nbtd-${j}"></canvas></div>
+      <div class="pics"><div style="position:relative"><img loading="lazy" src="${ROOT}data/${S.cache}/nominal/frames/${pad(n.idx)}.jpg?v=${S.index.version}">${pairSvg(n, j)}</div><canvas id="nbtd-${j}"></canvas></div>
       <div class="clist" style="margin-top:6px">${n.concepts.map(c => `<span class="c ${matchCls(c, mine)}">${c}</span>`).join("") || `<span class="dim">empty intersection</span>`}</div></div>`).join("");
   rows.forEach((n, j) => drawTopdown($(`nbtd-${j}`), n.rec, n.slot, true));
   for (const nb of $("knn-list").querySelectorAll(".nb")) nb.onclick = () => openFrame("nominal", +nb.dataset.p);

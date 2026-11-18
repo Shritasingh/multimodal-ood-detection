@@ -169,7 +169,10 @@ const lines = (col, src) => shown().filter(([e]) => S.scores[`${src}@${e}/${col}
   .map(([e, [n, c]]) => ({x:S.scores.tick, y:S.scores[`${src}@${e}/${col}`], name:n, line:{color:c, width:1.5}, mode:"lines"}));
 // the score sources a page plots, one plot each: test runs are scored from raw OWL-ViT and from the GT, pool runs from the GT only
 const plotSrcs = () => isTest() ? ["owl", "gt"] : ["gt"];
-const api = (path, pool = S.pool) => fetch(`${path}${path.includes("?") ? "&" : "?"}pool=${pool}`).then(r => r.json());
+// served by serve.py, or exported as static files by export_static.py (window.STATIC_SITE: read-only, every stride-th frame)
+const STATIC = !!window.STATIC_SITE;
+const apiUrl = (path, pool) => STATIC ? `data/${pool}/${path.split("/").slice(2).join("/")}.json` : `${path}${path.includes("?") ? "&" : "?"}pool=${pool}`;
+const api = (path, pool = S.pool) => fetch(apiUrl(path, pool)).then(r => r.json());
 const pad = t => String(t).padStart(6, "0");
 const run = () => S.index.runs.find(r => r.name === S.run);
 const isTest = () => run()?.group === "test";
@@ -210,14 +213,17 @@ async function setRun(name, tick = 0) {
   S.data = data; S.scores = scores; $("status").textContent = "";
   const r = run();
   $("info").textContent = `${r.group === "pool" ? "nominal pool run · ground truth · leave-one-out" : "test run · raw OWL-ViT and ground truth vs the GT cache"}${r.kind !== "nominal" ? ` · ${r.kind}` : ""}`;
-  $("slider").max = data.n - 1;
+  $("slider").max = data.n - 1; $("slider").step = STATIC ? S.index.stride : 1;
   for (const b of ["onset", "offset"]) $(b).disabled = !r.windows.length;
   $("show-owl").checked = r.group === "test";   // nominal pages: raw boxes off by default (information only)
   S.tick = Math.min(tick, data.n - 1);
   drawImagePlot(); draw(); drawScores();
 }
 
-function setTick(t) { S.tick = Math.max(0, Math.min(t, (S.data?.n || 1) - 1)); draw(); }
+function setTick(t) {
+  if (STATIC) t = t < S.tick ? point(t) : Math.ceil(t / S.index.stride) * S.index.stride;   // only the scored frames are exported
+  S.tick = Math.max(0, Math.min(t, (S.data?.n || 1) - 1)); draw();
+}
 function setTab(tab) {
   S.tab = tab;
   for (const b of document.querySelectorAll("nav button")) b.classList.toggle("on", b.dataset.tab === tab);
@@ -248,7 +254,7 @@ function draw() {
   $("slider").value = t;
   $("tick").innerHTML = `frame ${t} · point ${pt}${inWin ? ` · <span class="alert">ANOMALY</span>` : ""}`;
   drawLabels(); drawKnn(); moveCursor();
-  const src = `${S.data.frames}/${pad(t)}.jpg`;
+  const src = `${S.data.frames}/${pad(STATIC ? point(t) : t)}.jpg`;
   if (!S.img.src.endsWith(src)) { S.img.onload = drawCanvas; S.img.src = src; } else drawCanvas();
   saveHash();
 }
@@ -327,6 +333,7 @@ async function gtEdit(t, c, op) {
   if (!f.add.length) delete f.add;
   if (!Object.keys(f).length) delete S.data.overrides.frame[t];
   draw();
+  if (STATIC) { $("status").textContent = "static copy: edits are not saved"; return; }
   $("status").textContent = "saving…";
   const r = await fetch(`/api/labels/${S.run}`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(S.data.overrides)}).then(r => r.json());
   $("status").textContent = r.ok ? `saved · ${Object.keys(S.data.overrides.frame || {}).length} frames edited in ${S.run}` : "save failed";
