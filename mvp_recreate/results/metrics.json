@@ -1,0 +1,264 @@
+{
+ "q": 0.95,
+ "k": 5,
+ "semantic_k": 5,
+ "top_frac": 0.15,
+ "knn_patches": 17,
+ "caches": {
+  "cyclist": {
+   "n": 224,
+   "physics_entries": 219,
+   "semantic_sentences": [
+    "I see a cyclist on the sidewalk, an empty intersection and mountains in the distance.",
+    "I see a cyclist on the crosswalk, an empty sidewalk and mountains in the distance.",
+    "I see an empty sidewalk, an empty intersection and mountains in the distance.",
+    "I see an empty intersection.",
+    "I see an empty sidewalk.",
+    "I see a man on the sidewalk.",
+    "I see a woman on the sidewalk.",
+    "I see a child on the sidewalk.",
+    "I see a cyclist on the sidewalk.",
+    "I see mountains in the distance.",
+    "I see a man on the crosswalk.",
+    "I see a woman on the crosswalk.",
+    "I see a child on the crosswalk."
+   ],
+   "stats": {
+    "physics": {
+     "mean": 0.5281429965813024,
+     "std": 0.4500821628916071,
+     "tau": 1.8765911353988767
+    },
+    "physics_euclid": {
+     "mean": 3.8082794703167773,
+     "std": 1.219059785346606,
+     "tau": 5.840985976408396
+    },
+    "semantic": {
+     "mean": 0.08488467113050088,
+     "std": 0.005531932610160738,
+     "tau": 0.09096213488111456
+    },
+    "vision": {
+     "mean": 0.010118843908588002,
+     "std": 0.008283117792404487,
+     "tau": 0.026884764432907104
+    }
+   },
+   "groups": {
+    "nominal": {
+     "n": 224,
+     "physics": {
+      "above": 0.049107142857142856
+     },
+     "physics_euclid": {
+      "above": 0.049107142857142856
+     },
+     "semantic": {
+      "above": 0.0
+     },
+     "vision": {
+      "above": 0.049107142857142856
+     }
+    },
+    "wrongway": {
+     "n": 1,
+     "physics": {
+      "above": 1.0,
+      "score": 2.1904121549573667,
+      "z": 3.693257132645773,
+      "tau": 1.8765911353988767,
+      "tau_z": 2.996004396517975,
+      "below": 0.9910714285714286
+     },
+     "physics_euclid": {
+      "above": 1.0,
+      "score": 18.757210249752795,
+      "z": 12.262672396486035,
+      "tau": 5.840985976408396,
+      "tau_z": 1.6674379144692024,
+      "below": 1.0
+     },
+     "semantic": {
+      "above": 0.0,
+      "score": 0.07750318047337046,
+      "z": -1.3343421146476955,
+      "tau": 0.09096213488111456,
+      "tau_z": 1.0986149287955778,
+      "below": 0.0
+     },
+     "vision": {
+      "above": 0.0,
+      "score": 0.005859375,
+      "z": -0.5142349795500772,
+      "tau": 0.026884764432907104,
+      "tau_z": 2.0241074610448297,
+      "below": 0.48660714285714285
+     }
+    },
+    "droplet": {
+     "n": 1,
+     "physics": {
+      "above": 0.0,
+      "score": 0.1874756710217826,
+      "z": -0.7569003032043339,
+      "tau": 1.8765911353988767,
+      "tau_z": 2.996004396517975,
+      "below": 0.013392857142857142
+     },
+     "physics_euclid": {
+      "above": 0.0,
+      "score": 2.068860054756236,
+      "z": -1.4268532490930994,
+      "tau": 5.840985976408396,
+      "tau_z": 1.6674379144692024,
+      "below": 0.026785714285714284
+     },
+     "semantic": {
+      "above": 0.0,
+      "score": 0.07750318047337046,
+      "z": -1.3343421146476955,
+      "tau": 0.09096213488111456,
+      "tau_z": 1.0986149287955778,
+      "below": 0.0
+     },
+     "vision": {
+      "above": 1.0,
+      "score": 0.1390429586172104,
+      "z": 15.56468445092549,
+      "tau": 0.026884764432907104,
+      "tau_z": 2.0241074610448297,
+      "below": 1.0
+     }
+    }
+   }
+  },
+  "pedestrian": {
+   "n": 216,
+   "physics_entries": 36,
+   "semantic_sentences": [
+    "I see a woman on the crosswalk, an empty sidewalk and mountains in the distance.",
+    "I see a man on the crosswalk, an empty sidewalk and mountains in the distance.",
+    "I see an empty intersection.",
+    "I see an empty sidewalk.",
+    "I see a man on the sidewalk.",
+    "I see a woman on the sidewalk.",
+    "I see a child on the sidewalk.",
+    "I see a cyclist on the sidewalk.",
+    "I see mountains in the distance.",
+    "I see a man on the crosswalk.",
+    "I see a woman on the crosswalk.",
+    "I see a child on the crosswalk."
+   ],
+   "stats": {
+    "physics": {
+     "mean": 1.1035403521713212,
+     "std": 0.2357156759313859,
+     "tau": 1.6112451679835722
+    },
+    "physics_euclid": {
+     "mean": 2.554776369925822,
+     "std": 0.3501130828384923,
+     "tau": 3.3813204629312046
+    },
+    "semantic": {
+     "mean": 0.1057135961429669,
+     "std": 0.00015025364401088925,
+     "tau": 0.1058638497869778
+    },
+    "vision": {
+     "mean": 0.016235441598972236,
+     "std": 0.004886144679068235,
+     "tau": 0.025429686531424522
+    }
+   },
+   "groups": {
+    "nominal": {
+     "n": 216,
+     "physics": {
+      "above": 0.027777777777777776
+     },
+     "physics_euclid": {
+      "above": 0.027777777777777776
+     },
+     "semantic": {
+      "above": 0.0
+     },
+     "vision": {
+      "above": 0.046296296296296294
+     }
+    },
+    "conductor": {
+     "n": 1,
+     "physics": {
+      "above": 0.0,
+      "score": 1.0114925208031913,
+      "z": -0.3905036481108874,
+      "tau": 1.6112451679835722,
+      "tau_z": 2.153886515210121,
+      "below": 0.6388888888888888
+     },
+     "physics_euclid": {
+      "above": 0.0,
+      "score": 2.3660835975184447,
+      "z": -0.5389480760832395,
+      "tau": 3.3813204629312046,
+      "tau_z": 2.3607917941948737,
+      "below": 0.5833333333333334
+     },
+     "semantic": {
+      "above": 1.0,
+      "score": 0.140081403000556,
+      "z": 228.73193581313993,
+      "tau": 0.1058638497869778,
+      "tau_z": 1.0000000000000924,
+      "below": 1.0
+     },
+     "vision": {
+      "above": 0.0,
+      "score": 0.018574219197034836,
+      "z": 0.47865500341848116,
+      "tau": 0.025429686531424522,
+      "tau_z": 1.8816972350081098,
+      "below": 0.7731481481481481
+     }
+    },
+    "droplet": {
+     "n": 1,
+     "physics": {
+      "above": 0.0,
+      "score": 1.0114925208031913,
+      "z": -0.3905036481108874,
+      "tau": 1.6112451679835722,
+      "tau_z": 2.153886515210121,
+      "below": 0.6388888888888888
+     },
+     "physics_euclid": {
+      "above": 0.0,
+      "score": 2.3660835975184447,
+      "z": -0.5389480760832395,
+      "tau": 3.3813204629312046,
+      "tau_z": 2.3607917941948737,
+      "below": 0.5833333333333334
+     },
+     "semantic": {
+      "above": 0.0,
+      "score": 0.10556334249895602,
+      "z": -0.9999999999999076,
+      "tau": 0.1058638497869778,
+      "tau_z": 1.0000000000000924,
+      "below": 0.0
+     },
+     "vision": {
+      "above": 1.0,
+      "score": 0.14562010765075684,
+      "z": 26.479908915930352,
+      "tau": 0.025429686531424522,
+      "tau_z": 1.8816972350081098,
+      "below": 1.0
+     }
+    }
+   }
+  }
+ }
+}

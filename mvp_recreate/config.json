@@ -1,0 +1,96 @@
+{
+  "scene": {
+    "_help": "Town04 junction 916; the ego is parked ego_back_m before its lane's junction entry, on the straight extension of the lane, facing along it",
+    "town": "Town04_Opt",
+    "junction": 916,
+    "ego_road": 52,
+    "ego_lane": 1,
+    "ego_back_m": 14.0,
+    "ego_straight": "52:1->27:1",
+    "ego_bp": "vehicle.lincoln.mkz_2020",
+    "camera": {"width": 800, "height": 600, "fov": 60, "x": 1.6, "z": 1.7},
+    "keep_labels": ["Roads", "RoadLines", "Sidewalks", "Ground", "Sky", "Water", "Any", "NONE"],
+    "weather": {"cloudiness": 0.0, "precipitation": 0.0, "precipitation_deposits": 0.0, "wind_intensity": 0.0,
+                "fog_density": 2.0, "fog_distance": 0.75, "fog_falloff": 0.1, "wetness": 0.0,
+                "sun_altitude_angle": 45.0, "sun_azimuth_angle": -1.0},
+    "fixed_delta": 0.1,
+    "settle_ticks": 6,
+    "camera_warmup_ticks": 50,
+    "visible_px": 50,
+    "route_back_m": 60.0,
+    "route_ahead_m": 60.0,
+    "route_step_m": 0.5,
+    "crosswalk_radius_m": 30.0
+  },
+  "history": 5,
+  "cyclist": {
+    "_help": "nominal: every path in `paths` (the three other approaches x straight / right / left) with path_snaps snapshots from path_before_m before the junction to path_after_m after it, then ego_snaps snapshots on our lane from the opposite crosswalk, ego_span_m on (riding away), then, for each turning path, turn_snaps extra snapshots evenly inside its turn (from the start of the arc to `history` ticks past its end, so the 5-step history sweeps through the curve; appended after the ego-lane snapshots so earlier indices stay put), wrongway: at ego-lane snapshot wrong_at, riding towards us; turns: straight on in the approach lane, one smooth turn (radius turn_radius_m) where it meets the exit lane's line (left turns: at the far side, alongside the crosswalk ahead), then straight on in the exit lane; straights stay in the lane",
+    "bp": "vehicle.diamondback.century",
+    "speed": 4.0,
+    "curb_offset_m": 3.5,
+    "turn_radius_m": 3.0,
+    "paths": ["27:-1->52:-1", "27:-1->16:1", "27:-1->17:-1",
+              "16:-1->17:-1", "16:-1->52:-1", "16:-1->27:1",
+              "17:1->16:1", "17:1->27:1", "17:1->52:-1"],
+    "path_snaps": 20,
+    "turn_snaps": 4,
+    "path_before_m": 15.0,
+    "path_after_m": 15.0,
+    "ego_snaps": 20,
+    "ego_span_m": 22.5,
+    "wrong_at": 8
+  },
+  "pedestrian": {
+    "_help": "nominal: each bp x `positions` positions spread over the span `t` of the crosswalk nearest the ego (across our road; left -> right) x `orients`; conductor: conductor_bp standing at conductor_t; walking frames are recorded as ONE slow run per walker x direction (record_speed m/s, starting run_up_m before the first spot), each frame being the tick nearest its spot (so the spots, equally spaced, are passed at equal time steps); their physics history still uses `speed`",
+    "bps": ["walker.pedestrian.0001", "walker.pedestrian.0015", "walker.pedestrian.0017", "walker.pedestrian.0028", "walker.pedestrian.0046", "walker.pedestrian.0040"],
+    "speed": 1.3,
+    "record_speed": 0.44,
+    "run_up_m": 1.0,
+    "t": [0.1, 0.98],
+    "positions": 12,
+    "orients": ["stand", "walk_right", "walk_left"],
+    "conductor_bp": "walker.pedestrian.0030",
+    "conductor_t": 0.5
+  },
+  "droplet": {
+    "_help": "the vision anomaly, one frame per dataset: a nominal snapshot (cyclist: ego-lane wrong_at; pedestrian: nominal index pedestrian_src) with len(radii_px) irregular blobs of the image Gaussian-blurred (water drops on the lens), placed one by one over the most detailed spots, each fully inside the image and not overlapping the earlier ones (centres >= sum of radii x min_sep apart); they may cover the agent; blob k uses seed + k; blobs_from: every droplet frame reuses the blobs placed on that dataset's droplet source (same camera, same image spots; null = each its own)",
+    "radii_px": [75, 60, 45],
+    "min_sep": 0.9,
+    "blur_sigma": 12.0,
+    "seed": 7,
+    "pedestrian_src": 15,
+    "blobs_from": "cyclist"
+  },
+  "semantic": {
+    "_help": "ground-truth labels (encode.labels_of): '<object> <predicate>' of the agent if it has >= visible_px pixels, empty_sidewalk_label / empty_label when empty, always_labels always. A frame's labels are concatenated into one sentence, 'I see a <label>, an <label> and <label>.' (no article before a first word in no_article), and embedded whole. The semantic cache is the set of distinct sentences of the nominal frames plus one single-label sentence per extra_labels label",
+    "empty_label": "empty intersection",
+    "empty_sidewalk_label": "empty sidewalk",
+    "always_labels": ["mountains in the distance"],
+    "cyclist_predicates": ["on the sidewalk", "on the crosswalk"],
+    "crosswalk_near_m": 1.5,
+    "walker_nouns": {"walker.pedestrian.0001": "woman", "walker.pedestrian.0002": "man", "walker.pedestrian.0003": "man", "walker.pedestrian.0004": "man", "walker.pedestrian.0005": "woman", "walker.pedestrian.0006": "woman", "walker.pedestrian.0007": "woman", "walker.pedestrian.0008": "woman", "walker.pedestrian.0009": "child", "walker.pedestrian.0010": "child", "walker.pedestrian.0011": "child", "walker.pedestrian.0012": "child", "walker.pedestrian.0013": "child", "walker.pedestrian.0014": "child", "walker.pedestrian.0015": "woman", "walker.pedestrian.0016": "man", "walker.pedestrian.0017": "man", "walker.pedestrian.0018": "man", "walker.pedestrian.0019": "woman", "walker.pedestrian.0020": "woman", "walker.pedestrian.0021": "woman", "walker.pedestrian.0022": "woman", "walker.pedestrian.0023": "woman", "walker.pedestrian.0024": "man", "walker.pedestrian.0025": "man", "walker.pedestrian.0026": "man", "walker.pedestrian.0027": "man", "walker.pedestrian.0028": "man", "walker.pedestrian.0029": "man", "walker.pedestrian.0030": "man", "walker.pedestrian.0031": "woman", "walker.pedestrian.0032": "woman", "walker.pedestrian.0033": "man", "walker.pedestrian.0034": "man", "walker.pedestrian.0035": "woman", "walker.pedestrian.0036": "woman", "walker.pedestrian.0037": "woman", "walker.pedestrian.0038": "man", "walker.pedestrian.0039": "man", "walker.pedestrian.0040": "woman", "walker.pedestrian.0041": "woman", "walker.pedestrian.0042": "woman", "walker.pedestrian.0043": "woman", "walker.pedestrian.0044": "woman", "walker.pedestrian.0045": "man", "walker.pedestrian.0046": "man", "walker.pedestrian.0047": "man", "walker.pedestrian.0048": "child", "walker.pedestrian.0049": "child", "walker.pedestrian.0050": "child", "walker.pedestrian.0051": "child", "walker.pedestrian.0052": "man"},
+    "extra_labels": ["empty intersection", "empty sidewalk", "man on the sidewalk", "woman on the sidewalk", "child on the sidewalk",
+                     "cyclist on the sidewalk", "mountains in the distance", "man on the crosswalk", "woman on the crosswalk", "child on the crosswalk"],
+    "no_article": ["mountains"]
+  },
+  "physics": {
+    "_help": "PhysicsEncoder: 2 slots, agent (the nearest non-walker) and pedestrian (the nearest walker), 70-d"
+  },
+  "scoring": {
+    "_help": "q: conformal quantile; k: neighbours for physics (the cache holds each distinct physics vector once: vectors within duplicate_tol of each other, max abs difference, are one entry); semantic_k: nearest cache labels per label (the label score is their mean distance); vision_top_frac: the share of worst patches whose mean is the vision score; vision_knn_patches: the number of worst patches outlined on the dashboard and used to find the vision kNN (the nominal frames supplying the most of their nearest patches)",
+    "q": 0.95,
+    "k": 5,
+    "duplicate_tol": 1e-4,
+    "semantic_k": 5,
+    "sd_floor": 0.05,
+    "exact": 1e-6,
+    "vision_top_frac": 0.15,
+    "vision_knn_patches": 17
+  },
+  "dashboard": {
+    "port": 8013,
+    "heat_opacity": [0.15, 0.6],
+    "vmax_quantile": 0.995,
+    "vmax_factor": 1.5
+  }
+}
