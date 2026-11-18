@@ -1,7 +1,7 @@
 """Concept vocabulary and ground-truth concept extraction for the semantic24 experiment (AESOP-style concepts).
 
 A concept is an object and where it is: "bus stop on the sidewalk". The closed vocabulary below is shared by the
-ground truth, OWL-ViT (which scores every object x predicate phrase) and the closed-vocabulary Qwen prompt.
+ground truth and OWL-ViT (which scores every object x predicate phrase).
 
 Ground truth per frame comes from the recorded instance-segmentation image (R = semantic tag, G + 256 B = instance
 id), the depth image and the camera pose: every instance with >= MIN_PX pixels gets
@@ -13,10 +13,12 @@ id), the depth image and the camera pose: every instance with >= MIN_PX pixels g
              a vehicle (VEHICLES) off the road lanes is on the road within VEHICLE_ROAD_M of one, else beside it;
              anything but a vehicle in the kerb-side shoulder lane (Town02's is 0.3 m, the kerb line) is on the sidewalk:
              furniture, poles, signs and people standing at the kerb.
+             With kerb_m (KERB_SIDEWALK_M, extract_gt_concepts.py's default) the same goes for one with no lane under it within
+             kerb_m of a driving lane's edge: the map leaves a lane-less strip just behind Town02's kerb line, where
+             most street lamps, traffic lights and signs stand.
              Nothing in Town01/02 is "in the sky".
-Instances no rule names keep object None ("unlabeled"); the Labels tab shows them so they can be named by hand.
-Hand corrections live in data/semantic24/gt_overrides.json and are applied by effective_concepts(). Qwen's ground truth
-starts from those concepts at each Qwen frame and has its own corrections (gt_qwen_overrides.json, qwen_concepts()).
+Instances no rule names keep object None ("unlabeled"); the dashboard's Images tab shows them so they can be named by
+hand. Hand corrections live in data/semantic24/gt_overrides.json and are applied by effective_concepts().
 """
 from __future__ import annotations
 
@@ -102,6 +104,7 @@ SCENERY = {"building", "wall", "fence", "tree", "grass", "water", "bridge", "gua
 # park / driveway) is on the road if that point is within VEHICLE_ROAD_M of a driving lane's edge, else beside the road
 VEHICLES = set(OBJECT_FAMILIES["vehicles"]) | {"ambulance", "police car"}
 VEHICLE_ROAD_M = 3.0
+KERB_SIDEWALK_M = 1.5   # a non-vehicle with no lane under it this close to a driving lane is on the sidewalk
 
 MIN_PX = 250           # pixels for an instance to count as visible (about 16 x 16 of the 800 x 600 frame)
 ENV_MATCH_M = 1.0      # how far outside an environment object's box its instance point may fall
@@ -155,14 +158,19 @@ def backproject(u: np.ndarray, v: np.ndarray, depth: np.ndarray, cam: dict, fov:
 ROAD_LANES = ("Driving", "Bidirectional", "Shoulder", "Parking", "Biking", "Stop")
 
 
-def vehicle_predicate(cmap, x: float, y: float, z: float) -> str:
-    """Predicate of a vehicle whose ground point is off the road lanes: from the nearest driving lane, by distance."""
+def driving_gap(cmap, x: float, y: float, z: float):
+    """(metres from the nearest driving lane's edge, that lane's waypoint), or (inf, None) off the map."""
     import carla
 
     wp = cmap.get_waypoint(carla.Location(x, y, z), project_to_road=True, lane_type=carla.LaneType.Driving)
     if wp is None:
-        return "beside the road"
-    gap = math.hypot(x - wp.transform.location.x, y - wp.transform.location.y) - wp.lane_width / 2
+        return math.inf, None
+    return math.hypot(x - wp.transform.location.x, y - wp.transform.location.y) - wp.lane_width / 2, wp
+
+
+def vehicle_predicate(cmap, x: float, y: float, z: float) -> str:
+    """Predicate of a vehicle whose ground point is off the road lanes: from the nearest driving lane, by distance."""
+    gap, wp = driving_gap(cmap, x, y, z)
     if gap > VEHICLE_ROAD_M:
         return "beside the road"
     return "at the intersection" if wp.is_junction else "on the road"
@@ -208,9 +216,12 @@ class EnvIndex:
         return self.objects[idx[np.argmin(self.extent[idx].prod(1))]]
 
 
-def frame_instances(inst_bgra: np.ndarray, depth: np.ndarray, cam: dict, fov: float, cmap, env: EnvIndex, actors: dict) -> list[dict]:
+def frame_instances(inst_bgra: np.ndarray, depth: np.ndarray, cam: dict, fov: float, cmap, env: EnvIndex, actors: dict,
+                    kerb_m: float | None = None) -> list[dict]:
     """Every visible instance of one frame with its object, predicate, pixel count and box.
-    actors: {instance id (actor id & 0xFFFF): {"type_id", "base_type"}} of the run's spawned actors."""
+    actors: {instance id (actor id & 0xFFFF): {"type_id", "base_type"}} of the run's spawned actors.
+    kerb_m: if set, a non-scenery, non-vehicle instance placed beside the road (no road or sidewalk lane under it)
+    within kerb_m of a driving lane's edge is on the sidewalk (the kerb strip)."""
     tag = inst_bgra[..., 2].astype(np.int64)
     iid = inst_bgra[..., 1].astype(np.int64) + inst_bgra[..., 0].astype(np.int64) * 256
     key = (tag << 16 | iid).ravel()
@@ -248,6 +259,8 @@ def frame_instances(inst_bgra: np.ndarray, depth: np.ndarray, cam: dict, fov: fl
             rec["predicate"] = vehicle_predicate(cmap, *ground)
         elif lane == "Shoulder" and rec["object"] and rec["object"] not in VEHICLES:   # at the kerb: on the sidewalk's edge
             rec["predicate"] = "on the sidewalk"
+        elif kerb_m is not None and rec["object"] and pred == "beside the road" and driving_gap(cmap, *ground)[0] <= kerb_m:
+            rec["predicate"], rec["kerb"] = "on the sidewalk", True
         out.append(rec)
     return out
 
@@ -278,10 +291,3 @@ def apply_overrides(instances: list[dict], t: int, run_overrides: dict) -> list[
 def effective_concepts(instances: list[dict], t: int, run_overrides: dict) -> list[str]:
     """Sorted, de-duplicated concepts of tick t (named instances only) after the corrections."""
     return sorted({concept(r["object"], r["predicate"]) for r in apply_overrides(instances, t, run_overrides) if r.get("object")})
-
-
-def qwen_concepts(base: list[str], t: int, run_qwen_overrides: dict) -> list[str]:
-    """Qwen's ground truth at tick t: the (corrected) ground-truth concepts, then Qwen's own corrections,
-    run_qwen_overrides = {t: {"remove": [concept, ...], "add": [concept, ...]}}."""
-    edit = run_qwen_overrides.get(str(t), {})
-    return sorted((set(base) - set(edit.get("remove", []))) | set(edit.get("add", [])))

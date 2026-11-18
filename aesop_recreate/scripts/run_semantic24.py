@@ -1,18 +1,19 @@
-"""Record the semantic24 runs (sim/semantic24.py): Town01 / Town02, street furniture, parked cars; the test runs are long,
-the anomaly runs inject their anomaly P.INJECTIONS times.
+"""Record the semantic24 runs (sim/semantic24.py): Town01 / Town02, street furniture, parked cars, an agent-driven ego;
+each test anomaly run shows its anomaly once.
 
-    .venv/bin/python scripts/run_semantic24.py                    # every run not yet recorded, then the data configs
-    .venv/bin/python scripts/run_semantic24.py t2_haybale         # one run (re-recorded)
-    .venv/bin/python scripts/run_semantic24.py --config-only      # rewrite aesop_recreate/config/data_semantic24*.json
+    .venv/bin/python aesop_recreate/scripts/run_semantic24.py                    # every run not yet recorded, then the data config
+    .venv/bin/python aesop_recreate/scripts/run_semantic24.py t2_haybale         # one run (re-recorded)
+    .venv/bin/python aesop_recreate/scripts/run_semantic24.py --config-only      # rewrite aesop_recreate/config/data_semantic24.json
 
-Per run, aesop_recreate/data/semantic24_long/<run>/ (the short test runs of the first version stay in data/semantic24/): frames/*.jpg, inst/*.png (instance segmentation, BGRA as CARLA sends it),
+Per run, aesop_recreate/data/semantic24/<run>/: frames/*.jpg, inst/*.png (instance segmentation, BGRA as CARLA sends it),
 depth/*.png (uint16 centimetres), camera.jsonl (camera pose per tick), actors.json (instance id -> blueprint of
-every spawned actor), states.jsonl, run_info.json and, for anomaly runs, anomalies.json (per injection, onset / offset =
-the ticks it is on screen; for the pedestrian, the ticks he is on the road and on screen; "windows" lists the on-screen
-ones; the data configs take each injection's window from the ground truth once it is extracted, gt_windows()). data/semantic24/_towns/ keeps each town's OpenDRIVE map and environment objects,
-so scripts/extract_gt_concepts.py can label concepts offline. An anomaly run with fewer than P.INJECTIONS on-screen injections
-is re-recorded with a fresh seed (up to 4 times), and so is any run in which a vehicle is thrown into the air (CARLA's physics
-occasionally launches one, e.g. the Mitsubishi bus in Town02). Needs a CARLA server; one subprocess per run, so a crash costs one run.
+every spawned actor), states.jsonl, run_info.json and, for anomaly runs, anomalies.json (onset / offset = the ticks the
+anomaly is on screen; for the pedestrian, the ticks he is on the road and on screen; the data config takes the window
+from the ground truth once it is extracted, gt_windows()). data/semantic24/_towns/ keeps each town's OpenDRIVE map and
+environment objects, so scripts/extract_gt_concepts.py can label concepts offline. A run is re-recorded with a fresh
+seed (up to SEED_RETRIES times) if its anomaly is not clearly visible (P.MIN_VISIBLE_TICKS, P.MIN_PEAK_PX), a car
+collides or leaves its lane, or a vehicle is thrown into the air (CARLA's physics occasionally launches one).
+Needs a CARLA server; one subprocess per run, so a crash costs one run.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ import collections
 import dataclasses
 import json
 import math
+import os
 import queue
 import random
 import shutil
@@ -43,14 +45,18 @@ from run_scenario import CAMERA, EGO_BLUEPRINT, FIXED_DELTA, connect, spawn_traf
 from sim import concepts as K, placement, scenarios as S, semantic24 as P  # noqa: E402
 from sim.state_extractor import GroundTruthStateHistory  # noqa: E402
 
-OUT = ROOT / "data" / "semantic24_long"
+sys.path.append(str(MAIN.parent / "carla_sim" / "CARLA_0.9.16" / "PythonAPI" / "carla"))   # CARLA's agents package
+from agents.navigation.behavior_agent import BehaviorAgent  # noqa: E402
+from agents.navigation.local_planner import RoadOption  # noqa: E402
+
+AGENT_LOG = os.environ.get("AGENT_LOG")   # debugging: AGENT_LOG=<file> logs the ego driver's state every tick
+OUT = ROOT / "data" / P.DATASET
 TOWNS = OUT / "_towns"
 RUN_TIMEOUT_S = 1200
-LONG_RUN_TIMEOUT_S = 5400
 SEED_RETRIES = 4
-# CARLA's only bus is thrown into the air by its physics now and then (t2_nominal_08 and t2_pedestrian, Town02): runs recorded
-# after 2026-10-30 leave it out of the traffic (spawn_traffic and the lead car read S.NOT_IN_TRAFFIC)
-S.NOT_IN_TRAFFIC = S.NOT_IN_TRAFFIC | {"vehicle.mitsubishi.fusorosa"}
+# CARLA's only bus is thrown into the air by its physics now and then (Town02), and the Cybertruck rubs kerbs / guard
+# rails on tight corners and is too: both are left out of the traffic (spawn_traffic and the lead car read S.NOT_IN_TRAFFIC)
+S.NOT_IN_TRAFFIC = S.NOT_IN_TRAFFIC | {"vehicle.mitsubishi.fusorosa", "vehicle.tesla.cybertruck"}
 AIRBORNE_TILT_DEG = 30.0   # a vehicle rolled or pitched beyond this, or rising faster than AIRBORNE_VZ, fails the run
 AIRBORNE_VZ = 3.0
 
@@ -92,15 +98,72 @@ def spawn_prop(world, name: str, wp, lateral: float = 0.0, along: float = 0.0, y
     return a
 
 
+def clear_point(route: list, at_m: float, step_m: float = 2.0) -> float:
+    """at_m moved forward to the first route point with no junction within P.SCENE_CLEAR_M behind or ahead of it."""
+    n, i = int(P.SCENE_CLEAR_M / step_m), int(at_m / step_m)
+    while i < len(route) - 1 and any(w.is_junction for w in route[max(0, i - n) : i + n + 1]):
+        i += 1
+    return i * step_m
+
+
+_BARRIERS: dict = {}   # map name -> [(location, extent)] of its guard rails, fences and walls
+
+
+def kerb_open(world, wp, along_m: float = 6.0) -> bool:
+    """No guard rail, fence or wall between the right sidewalk and the road within along_m of wp (the pedestrian
+    anomaly's way onto the road)."""
+    m = world.get_map().name
+    if m not in _BARRIERS:
+        _BARRIERS[m] = [(o.bounding_box.location, o.bounding_box.extent) for lab in (carla.CityObjectLabel.GuardRail, carla.CityObjectLabel.Fences, carla.CityObjectLabel.Walls)
+                        for o in world.get_environment_objects(lab)]
+    loc, fwd, right = wp.transform.location, wp.transform.get_forward_vector(), wp.transform.get_right_vector()
+    for c, e in _BARRIERS[m]:
+        dx, dy = c.x - loc.x, c.y - loc.y
+        a, r = dx * fwd.x + dy * fwd.y, dx * right.x + dy * right.y
+        # a rail / fence runs along the kerb: its box centre is beside the kerb, up to its half length along the road
+        if abs(a) < along_m + max(e.x, e.y) and wp.lane_width / 2 - 0.5 < r < wp.lane_width / 2 + P.PED_KERB_M + 1.0:
+            return False
+    return True
+
+
+def anomaly_spot(world, route: list, kind: str, at_m: float, clear_kinds: tuple, open_kerb: bool) -> float:
+    """Route distance where an anomaly goes: past any junction (route_point), for clear_kinds where no junction is within
+    P.SCENE_CLEAR_M, and (open_kerb) for the pedestrian where nothing blocks his way onto the road."""
+    at_m = 2.0 * S.route_point(route, at_m)
+    if kind in clear_kinds:
+        at_m = clear_point(route, at_m)
+    for _ in range(40 if open_kerb and kind == "pedestrian" else 0):
+        if kerb_open(world, route[S.route_point(route, at_m)]):
+            break
+        at_m = clear_point(route, at_m + 4.0)
+    return at_m
+
+
+def clear_kerb(world, client, wp) -> list:
+    """Room for the emergency scene at wp: destroy the spawned props on the right kerb within P.SCENE_CLEAR_M of it and
+    hide the town's own small objects there; returns the hidden ones' ids (enable_environment_objects shows them again)."""
+    loc, fwd, right = wp.transform.location, wp.transform.get_forward_vector(), wp.transform.get_right_vector()
+
+    def on_kerb(p) -> bool:
+        dx, dy = p.x - loc.x, p.y - loc.y
+        return abs(dx * fwd.x + dy * fwd.y) < P.SCENE_CLEAR_M and wp.lane_width / 2 - 0.5 < dx * right.x + dy * right.y < wp.lane_width / 2 + P.KERB_CLEAR_M
+
+    client.apply_batch_sync([carla.command.DestroyActor(a) for a in world.get_actors().filter("static.prop.*") if on_kerb(a.get_location())])
+    labels = (carla.CityObjectLabel.Poles, carla.CityObjectLabel.Static, carla.CityObjectLabel.Dynamic, carla.CityObjectLabel.Vegetation, carla.CityObjectLabel.Other)
+    hidden = [o.id for lab in labels for o in world.get_environment_objects(lab) if on_kerb(o.transform.location)]
+    world.enable_environment_objects(set(hidden), False)
+    return hidden
+
+
 def park_vehicle(world, bp, wp, along: float = 0.0, lights: bool = False):
-    """A stopped vehicle at the right kerb, its inner side P.PARK_KERB_M past the lane edge so the ego can pass (in Town02
-    the shoulder is 0.3 m, so it stands partly on the kerb), physics off so it stays put and upright."""
+    """A stopped vehicle against the right kerb, its inner side on the lane edge, so the ego can pass (in Town02 the
+    shoulder is 0.3 m, so it stands partly on the kerb). Physics off: the kerb overlap would otherwise tip it over."""
     loc = S.offset_location(wp, wp.lane_width / 2 + 1.2, along)
     ground_z, _ = placement.ground_height(world, loc.x, loc.y, loc.z, loc.z)
     a, _ = placement.spawn_on_ground(world, bp, loc.x, loc.y, wp.transform.rotation.yaw, ground_z)
     if a is None:
         return None
-    loc = S.offset_location(wp, wp.lane_width / 2 + a.bounding_box.extent.y + P.PARK_KERB_M, along)
+    loc = S.offset_location(wp, wp.lane_width / 2 + a.bounding_box.extent.y + 0.05, along)
     a.set_simulate_physics(False)
     a.set_transform(carla.Transform(carla.Location(loc.x, loc.y, a.get_location().z), carla.Rotation(yaw=wp.transform.rotation.yaw)))
     if lights:
@@ -212,15 +275,102 @@ class Crossing:
         return self.phase
 
 
+class AgentDriver:
+    """The ego: CARLA's BehaviorAgent following the planned route point by point, stepped every tick.
+    On top of the agent's own speed choice (P.SPEED_PCT of the limit), a cap that slows it at <= P.SLOW_A for
+    what lies on its route ahead (at least P.LOOKAHEAD_WPS points, and as far as it needs to stop from its speed):
+    curves (taken at <= P.CURVE_A_LAT), red / yellow lights
+    (stop 2 m before the line), walkers on its lane and cars on its path (stop P.STOP_GAP_M short, or follow the car
+    at its speed). The agent's own emergency stop stays as the fallback."""
+
+    def __init__(self, world, m, ego, route: list):
+        self.world, self.m, self.ego = world, m, ego
+        self.agent = BehaviorAgent(ego, behavior="cautious", map_inst=m,
+                                   opt_dict={**P.AGENT, "dt": FIXED_DELTA,
+                                             "longitudinal_control_dict": {**P.AGENT["longitudinal_control_dict"], "dt": FIXED_DELTA}})
+        self.stop_lines = [(tl, [w.transform.location for w in tl.get_stop_waypoints()]) for tl in world.get_actors().filter("traffic.traffic_light")]
+        self.set_route(route)
+
+    def set_route(self, route: list) -> None:
+        self.agent.set_global_plan([(w, RoadOption.LANEFOLLOW) for w in route[1:]], clean_queue=True)
+
+    def _cap(self) -> float:
+        """Speed cap in m/s from what lies ahead: min over constraints of sqrt(v_i^2 + 2 a d_i)."""
+        a, cap, here = P.SLOW_A, 1e9, self.ego.get_location()
+        vel = self.ego.get_velocity()
+        n = max(P.LOOKAHEAD_WPS, math.ceil(((vel.x ** 2 + vel.y ** 2) / (2 * a) + 15.0) / 2.0))   # stopping distance + 15 m
+        q = [w for w, _ in list(self.agent._local_planner._waypoints_queue)[:n]]
+        if len(q) < 2:
+            return 0.0
+        dist, d, prev = [], 0.0, here
+        for w in q:
+            d += prev.distance(w.transform.location)
+            prev = w.transform.location
+            dist.append(d)
+        ahead = lambda v, d_stop: math.sqrt(v * v + 2 * a * max(0.0, d_stop))  # noqa: E731
+        for w0, w1, d0 in zip(q, q[1:], dist):   # curves
+            step = w0.transform.location.distance(w1.transform.location)
+            k = abs(math.radians((w1.transform.rotation.yaw - w0.transform.rotation.yaw + 180) % 360 - 180)) / step if step > 0.1 else 0.0
+            if k > 1e-3:
+                cap = min(cap, ahead(math.sqrt(P.CURVE_A_LAT / k), d0))
+        for tl, lines in self.stop_lines:   # red / yellow lights whose stop line is on the route ahead
+            if tl.state in (carla.TrafficLightState.Red, carla.TrafficLightState.Yellow):
+                for loc in lines:
+                    hit = [d0 for w, d0 in zip(q, dist) if w.transform.location.distance(loc) < 1.5]
+                    if hit:
+                        cap = min(cap, ahead(0.0, hit[0] - 2.0))
+        on_path = lambda loc, r: next((d0 for w, d0 in zip(q, dist) if w.transform.location.distance(loc) < r), None)  # noqa: E731
+        for wk in self.world.get_actors().filter("walker.pedestrian.*"):   # walkers on a driving lane of the route ahead
+            loc = wk.get_location()
+            if loc.distance(here) < dist[-1] + 5 and self.m.get_waypoint(loc, project_to_road=False, lane_type=carla.LaneType.Driving) is not None:
+                if (d0 := on_path(loc, 2.5)) is not None:
+                    cap = min(cap, ahead(0.0, d0 - P.STOP_GAP_M))
+        for v in self.world.get_actors().filter("vehicle.*"):   # cars on the route ahead: follow them
+            if v.id == self.ego.id or v.get_location().distance(here) > dist[-1] + 5:
+                continue
+            if (d0 := on_path(v.get_location(), 1.8)) is not None:
+                vel = v.get_velocity()
+                cap = min(cap, ahead(math.hypot(vel.x, vel.y), d0 - P.STOP_GAP_M))
+        return cap
+
+    def _drop_passed(self) -> None:
+        """Drop the route points already behind the ego. The agent's emergency stop returns before its local planner
+        pops the points it passes, so an ego braking past one keeps it as its target and, moving off again, steers
+        back towards it, off the road (t2_nominal_10, 2026-11-04)."""
+        q, tf = self.agent._local_planner._waypoints_queue, self.ego.get_transform()
+        f, loc = tf.get_forward_vector(), tf.location
+        while len(q) > 1:
+            w = q[0][0].transform.location
+            if (w.x - loc.x) * f.x + (w.y - loc.y) * f.y >= 0.0:
+                break
+            q.popleft()
+
+    def step(self) -> None:
+        self._drop_passed()
+        limit = self.ego.get_speed_limit()   # km/h
+        self.agent._behavior.speed_lim_dist = (1 - P.SPEED_PCT / 100) * limit
+        cap = self._cap()
+        self.agent._behavior.max_speed = min(limit, 3.6 * cap)
+        control = self.agent.run_step()
+        self.ego.apply_control(control)
+        if AGENT_LOG:
+            lp, loc = self.agent._local_planner, self.ego.get_location()
+            tw = lp.target_waypoint.transform.location if lp.target_waypoint is not None else None
+            with open(AGENT_LOG, "a") as f:
+                f.write(json.dumps({"queue": len(lp._waypoints_queue), "x": round(loc.x, 2), "y": round(loc.y, 2), "cap": round(cap, 2),
+                                    "target": [round(tw.x, 1), round(tw.y, 1)] if tw else None, "limit": limit,
+                                    "steer": round(control.steer, 3), "throttle": round(control.throttle, 3), "brake": round(control.brake, 3)}) + "\n")
+
+
 class RouteTracker:
-    """A long run's ego along its planned route, stepped every tick: its route distance (the nearest route point,
-    searched forwards since the route can pass a place twice), and a new route from where the ego is once it has left
-    the planned one (P.OFF_ROUTE_M for P.OFF_ROUTE_S) or nears its end. Street furniture is placed along the route as
-    the ego goes, up to FURNISH_AHEAD_M ahead of it."""
+    """The ego along its planned route, stepped every tick: its route distance (the nearest route point, searched
+    forwards since the route can pass a place twice), and a new route from where the ego is once it has left the
+    planned one (P.OFF_ROUTE_M for P.OFF_ROUTE_S) or nears its end. Street furniture is placed along the route as the
+    ego goes, up to FURNISH_AHEAD_M ahead of it. set_route(route) hands a new route to the ego's driver."""
     FURNISH_AHEAD_M = 300.0
 
-    def __init__(self, world, tm, ego, route: list, rng: random.Random):
-        self.world, self.tm, self.ego, self.route, self.rng = world, tm, ego, route, rng
+    def __init__(self, world, set_route, ego, route: list, rng: random.Random):
+        self.world, self.set_route, self.ego, self.route, self.rng = world, set_route, ego, route, rng
         self.k, self.off, self.replans, self.props, self.furnished = 0, 0, 0, [], 0.0
         self._furnish()
 
@@ -240,8 +390,8 @@ class RouteTracker:
             self._furnish()
             return False
         start = self.world.get_map().get_waypoint(loc, lane_type=carla.LaneType.Driving)
-        self.route, self.k, self.off, self.furnished = S.plan_route(self.world, start, P.LONG_ROUTE_M, self.rng), 0, 0, 0.0
-        self.tm.set_path(self.ego, S.path_points(self.route))
+        self.route, self.k, self.off, self.furnished = S.plan_route(self.world, start, P.ROUTE_M, self.rng), 0, 0, 0.0
+        self.set_route(self.route)
         self._furnish()
         self.replans += 1
         return True
@@ -252,39 +402,45 @@ class RouteTracker:
 
 
 class Injector:
-    """A long anomaly run's injections, stepped every tick: one at a time, placed ahead of the ego on its route, removed
-    once the ego is P.REMOVE_PAST_M past it (or after P.INJECTION_TIMEOUT_S, or when the ego's route is replaced),
-    until P.INJECTIONS came on screen."""
+    """An anomaly run's injection, stepped every tick: placed once at the run's anomaly spot (at_m) on the ego's route,
+    removed once the ego is P.REMOVE_PAST_M past it (or after P.INJECTION_TIMEOUT_S, or when the ego's route is
+    replaced). It counts once it is on screen on P.MIN_VISIBLE_TICKS ticks and reaches P.MIN_PEAK_PX."""
+    n = 1   # injections needed on screen
 
-    def __init__(self, world, client, kind: str, rng: random.Random):
-        self.world, self.client, self.kind, self.rng = world, client, kind, rng
-        self.cur, self.done = None, []   # the live injection, the finished ones
+    def __init__(self, world, client, kind: str, rng: random.Random, at_m: float):
+        self.world, self.client, self.kind, self.rng, self.at_m = world, client, kind, rng, at_m
+        self.cur, self.done = None, []   # the live injection, the finished one
 
     @property
     def n_visible(self) -> int:
         return sum(r["visible"] for r in self.done)
 
     def _place(self, t: int, route: list, at_m: float) -> None:
-        at_m = 2.0 * S.route_point(route, at_m)   # where it really goes: route_point moves it past any junction
+        at_m = anomaly_spot(self.world, route, self.kind, at_m, P.ANOMALIES, True)
+        hidden = []
+        if self.kind == "emergency":   # on a cleared kerb
+            hidden = clear_kerb(self.world, self.client, route[S.route_point(route, at_m)])
         actors = place_anomaly(self.world, route, self.kind, at_m, self.rng)
         missing = not actors or None in actors   # a scene vehicle or the walker found no free spot
         actors = [a for a in actors if a is not None]
         crossing = Crossing(actors[0], route[S.route_point(route, at_m)]) if self.kind == "pedestrian" and actors else None
         self.cur = {"at_m": round(at_m, 1), "start": t, "actors": actors, "ids": [a.id & 0xFFFF for a in actors],
-                    "crossing": crossing, "missing": missing, "px": [], "on_road": [], "phases": []}
+                    "crossing": crossing, "missing": missing, "hidden": hidden, "px": [], "on_road": [], "phases": []}
 
     def _finish(self, t: int) -> None:
         c, self.cur = self.cur, None
         vis = [c["start"] + j for j, (n, r) in enumerate(zip(c["px"], c["on_road"])) if n >= P.MIN_VISIBLE_PX and r]
-        ok = len(vis) >= P.MIN_VISIBLE_TICKS and not c["missing"]
+        ok = len(vis) >= P.MIN_VISIBLE_TICKS and max(c["px"], default=0) >= P.MIN_PEAK_PX and not c["missing"]
         self.done.append({"i": len(self.done), "at_m": c["at_m"], "start": c["start"], "end": t, "visible": ok,
                           "onset": vis[0] if ok else None, "offset": vis[-1] + 1 if ok else None, "n_visible_ticks": len(vis),
+                          "peak_px": max(c["px"], default=0),
                           "missing": c["missing"], "actors": [{"id": a.id, "blueprint": a.type_id} for a in c["actors"]],
                           **({"phases": c["phases"]} if c["crossing"] is not None else {})})
         print(f"injection {len(self.done)}: ticks {c['start']}-{t} at {c['at_m']} m, on screen {len(vis)} ticks, peak {max(c['px'], default=0)} px"
               + (f", phases {dict(collections.Counter(c['phases']))}, {c['crossing'].walker.get_location().distance(c['crossing'].goals['in']):.1f} m from the lane centre" if c["phases"] else "")
               + (" MISSING" if c["missing"] else ""), flush=True)
         self.client.apply_batch_sync([carla.command.DestroyActor(a) for a in c["actors"]])
+        self.world.enable_environment_objects(set(c["hidden"]), True)
 
     def step(self, t: int, ego, track: RouteTracker, replanned: bool) -> None:
         """Before the world tick: step the live injection, remove it once passed (or off the ego's new route), place the next."""
@@ -294,8 +450,8 @@ class Injector:
                 c["phases"].append(c["crossing"].step(ego))
             if replanned or at > c["at_m"] + P.REMOVE_PAST_M or t - c["start"] > P.INJECTION_TIMEOUT_S / FIXED_DELTA:
                 self._finish(t)
-        if self.cur is None and self.n_visible < P.INJECTIONS and len(self.done) < P.MAX_INJECTIONS:
-            self._place(t, track.route, at + self.rng.uniform(*(P.PED_AT_M if self.kind == "pedestrian" else P.INJECT_AHEAD_M)))
+        if self.cur is None and not self.done:
+            self._place(t, track.route, self.at_m)
             if self.cur["missing"]:
                 self._finish(t)
 
@@ -336,15 +492,6 @@ def freeze_walkers(m, walkers: list, controllers: list, frozen: set, last: dict)
             frozen.add(w.id)
 
 
-def break_jam(client, ego, vehicles: list) -> int:
-    """Remove the background cars within P.JAM_AHEAD_M ahead of the ego; how many."""
-    loc, fwd = ego.get_location(), ego.get_transform().get_forward_vector()
-    ahead = [v for v in vehicles if v.is_alive and 0 < (v.get_location().x - loc.x) * fwd.x + (v.get_location().y - loc.y) * fwd.y
-             and v.get_location().distance(loc) < P.JAM_AHEAD_M]
-    client.apply_batch_sync([carla.command.DestroyActor(v) for v in ahead])
-    return len(ahead)
-
-
 def airborne(vehicles: list) -> list:
     """The vehicles CARLA's physics has thrown into the air or over on their side this tick."""
     out = []
@@ -355,6 +502,34 @@ def airborne(vehicles: list) -> list:
         if abs(r.roll) > AIRBORNE_TILT_DEG or abs(r.pitch) > AIRBORNE_TILT_DEG or vz > AIRBORNE_VZ:
             out.append(v.type_id)
     return out
+
+
+def smooth_tm(tm, v, speed_diff_pct: float = 100.0 - P.SPEED_PCT) -> None:
+    """A Traffic Manager car that keeps its lane, a P.LEADING_GAP_M gap and every rule."""
+    tm.auto_lane_change(v, False)
+    tm.random_left_lanechange_percentage(v, 0.0)
+    tm.random_right_lanechange_percentage(v, 0.0)
+    tm.distance_to_leading_vehicle(v, P.LEADING_GAP_M)
+    tm.vehicle_percentage_speed_difference(v, speed_diff_pct)
+    for ignore in (tm.ignore_lights_percentage, tm.ignore_signs_percentage, tm.ignore_vehicles_percentage, tm.ignore_walkers_percentage):
+        ignore(v, 0.0)
+
+
+def collision_sensors(world, cars: list, events: list, ego) -> list:
+    """A collision sensor on every car; each event appends (sim time, car, what it hit) to events, the
+    car being "ego" or its blueprint (states.jsonl's "t" is the same clock)."""
+    bp = world.get_blueprint_library().find("sensor.other.collision")
+    out = []
+    for car in cars:
+        s = world.spawn_actor(bp, carla.Transform(), attach_to=car)
+        name = "ego" if car.id == ego.id else car.type_id
+        s.listen(lambda e, c=name: events.append((round(e.timestamp, 2), c, e.other_actor.type_id if e.other_actor else "?")))
+        out.append(s)
+    return out
+
+
+def off_lane(m, actor) -> bool:
+    return m.get_waypoint(actor.get_location(), project_to_road=False, lane_type=carla.LaneType.Driving) is None
 
 
 def cameras(world, ego) -> list:
@@ -373,7 +548,8 @@ def cameras(world, ego) -> list:
 
 
 def record(p: P.Plan, seed: int) -> int:
-    """Record one run; exit status 3 if fewer than P.INJECTIONS of its anomalies came on screen."""
+    """Record one run; exit status 3 if its anomaly was not clearly on screen, a vehicle was thrown into the air or a
+    car collided or left its lane."""
     sc = P.sample(p, seed)
     out = OUT / p.name
     shutil.rmtree(out, ignore_errors=True)
@@ -386,61 +562,65 @@ def record(p: P.Plan, seed: int) -> int:
     save_town(world)
     world.set_weather(getattr(carla.WeatherParameters, P.WEATHER))
     world.set_pedestrians_cross_factor(0.0)
-    cams, ego, lead, vehicles, walkers, controllers, props, injector, track = [], None, None, [], [], [], [], None, None
+    cams, ego, lead, vehicles, walkers, controllers, injector, track = [], None, None, [], [], [], None, None
+    sensors, crashes = [], []
     status = 0
     try:
         bp_lib, m = world.get_blueprint_library(), world.get_map()
         for sp in rng.sample(m.get_spawn_points(), len(m.get_spawn_points())):
             start = m.get_waypoint(sp.location, lane_type=carla.LaneType.Driving)
-            route = S.plan_route(world, start, P.LONG_ROUTE_M if p.long else S.ROUTE_M, rng)
-            if len(route) * 2.0 >= 0.8 * (P.LONG_ROUTE_M if p.long else S.ROUTE_M) and (ego := world.try_spawn_actor(bp_lib.find(EGO_BLUEPRINT), sp)) is not None:
+            route = S.plan_route(world, start, S.ROUTE_M, rng)
+            if len(route) * 2.0 >= 0.8 * S.ROUTE_M and (ego := world.try_spawn_actor(bp_lib.find(EGO_BLUEPRINT), sp)) is not None:
                 break
-        tm.auto_lane_change(ego, False)
-        ego.set_autopilot(True, tm.get_port())
-        tm.set_path(ego, S.path_points(route))
-        if not p.pools:   # a test run: the ego drives slower all run
-            tm.vehicle_percentage_speed_difference(ego, 100.0 - P.TEST_SPEED_PCT)
+        driver = AgentDriver(world, m, ego, route)
         car_bps = [b for b in bp_lib.filter("vehicle.*") if b.get_attribute("number_of_wheels").as_int() == 4 and b.id not in S.NOT_IN_TRAFFIC]
-        if sc["lead"] and p.kind == "nominal" and not p.long:   # a lead car would hide the test runs' anomalies
+        if sc["lead"] and p.kind == "nominal":   # a lead car would hide the test runs' anomalies
             k = S.route_point(route, sc["lead_gap_m"], avoid_junction=False)
             tf = route[k].transform
             lead = world.try_spawn_actor(rng.choice(car_bps), carla.Transform(tf.location + carla.Location(z=0.4), tf.rotation))
             if lead is not None:
                 lead.set_autopilot(True, tm.get_port())
                 tm.auto_lane_change(lead, False)
+                smooth_tm(tm, lead)
                 tm.vehicle_percentage_speed_difference(lead, sc["lead_speed_diff_pct"])
                 tm.set_path(lead, S.path_points(route[k:]))
-        props = [] if p.long else place_furniture(world, route, rng, P.FURNITURE_UNTIL_M)   # long runs: the route tracker's
-        track = RouteTracker(world, tm, ego, route, rng) if p.long else None
-        traffic, walkers, controllers = spawn_traffic(world, tm, SimpleNamespace(n_vehicles=sc["n_vehicles"], n_walkers=sc["n_walkers"]), rng,
-                                                      [a.get_location() for a in (ego, lead) if a is not None])
+        track = RouteTracker(world, driver.set_route, ego, route, rng)   # it places the street furniture
+        reserved = [a.get_location() for a in (ego, lead) if a is not None]
+        anomaly_at = None
+        if p.kind != "nominal":   # one anomaly: its junction-free spot, no traffic spawned on the way there
+            anomaly_at = anomaly_spot(world, route, p.kind, sc["anomaly_at_m"], P.ANOMALIES, True)
+            reserved += [w.transform.location for w in route[: S.route_point(route, anomaly_at + 20.0, avoid_junction=False) : 5]]
+        traffic, walkers, controllers = spawn_traffic(world, tm, SimpleNamespace(n_vehicles=sc["n_vehicles"], n_walkers=sc["n_walkers"]), rng, reserved)
         vehicles += traffic
+        for v in vehicles:
+            smooth_tm(tm, v)
         if p.kind != "nominal":
-            injector = Injector(world, client, p.kind, rng)
+            injector = Injector(world, client, p.kind, rng, anomaly_at)
         # walkers whose spawn point is on a road lane would be nominal 'pedestrian on the road': remove them
         on_road = [i for i, w in enumerate(walkers) if on_road_lane(m, w.get_location())]
         for i in reversed(on_road):
             controllers[i].stop()
             client.apply_batch_sync([carla.command.DestroyActor(controllers.pop(i)), carla.command.DestroyActor(walkers.pop(i))])
         cams = cameras(world, ego)
+        sensors = collision_sensors(world, [a for a in [ego, lead] + vehicles if a is not None], crashes, ego)
         world.tick()
         for _, q in cams:   # drop the frames of the settling tick
             q.get()
-        everyone = [a for a in [lead] + vehicles + walkers + props if a is not None]
+        everyone = [a for a in [lead] + vehicles + walkers if a is not None]
         actors = {str(a.id & 0xFFFF): {"actor_id": a.id, "type_id": a.type_id, "base_type": a.attributes.get("base_type", "")} for a in everyone}
         (out / "run_info.json").write_text(json.dumps({
             "run_name": p.name, **dataclasses.asdict(p), **sc, "ego_id": ego.id, "lead_id": lead.id if lead else None,
-            "n_vehicles_spawned": len(vehicles), "n_walkers_spawned": len(walkers), "n_walkers_removed_on_road": len(on_road), "n_props": len(props),
+            "n_vehicles_spawned": len(vehicles), "n_walkers_spawned": len(walkers), "n_walkers_removed_on_road": len(on_road),
             "n_ticks": p.n_ticks, "fixed_delta": FIXED_DELTA, "camera": {k: CAMERA[k] for k in ("width", "height", "fov")},
             "route_xy": [[round(w.transform.location.x, 1), round(w.transform.location.y, 1)] for w in route[::5]]}))
 
         history = GroundTruthStateHistory(max_len=4)
         flying, frozen, last, freeze, n_props = [], set(), {}, p.town in P.FREEZE_TOWNS, 0
-        still_since, still_at, jam_removed = 0, ego.get_location(), 0
+        off_since, off_road = {}, []   # car id -> first tick off the driving lanes; (tick, car) that stayed off too long
         with open(out / "states.jsonl", "w") as fs, open(out / "camera.jsonl", "w") as fc:
             for t in range(p.n_ticks):
-                replanned = track.step() if track is not None else False
-                if track is not None and len(track.props) > n_props:   # new street furniture joins actors.json
+                replanned = track.step()
+                if len(track.props) > n_props:   # new street furniture joins actors.json
                     actors.update({str(a.id & 0xFFFF): {"actor_id": a.id, "type_id": a.type_id, "base_type": ""} for a in track.props[n_props:]})
                     n_props = len(track.props)
                 if injector is not None:
@@ -448,15 +628,9 @@ def record(p: P.Plan, seed: int) -> int:
                     if injector.cur is not None:   # injection actors join actors.json (the ground truth's instance ids)
                         actors.update({str(a.id & 0xFFFF): {"actor_id": a.id, "type_id": a.type_id, "base_type": a.attributes.get("base_type", "")}
                                        for a in injector.cur["actors"]})
-                if p.long:
-                    here = ego.get_location()
-                    if here.distance(still_at) > 1.0:
-                        still_since, still_at = t, here
-                    elif t - still_since > P.JAM_S / FIXED_DELTA:
-                        jam_removed += break_jam(client, ego, vehicles)
-                        still_since = t
                 if freeze:
                     freeze_walkers(m, walkers, controllers, frozen, last)
+                driver.step()
                 world.tick()
                 rgb, inst, depth = (q.get() for _, q in cams)
                 rgb.save_to_disk(str(out / "frames" / f"{t:06d}.jpg"))
@@ -470,19 +644,24 @@ def record(p: P.Plan, seed: int) -> int:
                 if injector is not None:
                     injector.observe(m, bgra[..., 1].astype(np.int32) + bgra[..., 0].astype(np.int32) * 256)
                 flying += [(t, v) for v in airborne([a for a in [ego, lead] + vehicles if a is not None])]
+                for car in [a for a in [ego, lead] + vehicles if a is not None and a.is_alive]:   # the ego off its lanes on any tick, another car for P.OFF_LANE_S
+                    if not off_lane(m, car):
+                        off_since.pop(car.id, None)
+                    elif t - off_since.setdefault(car.id, t) >= (0 if car is ego else P.OFF_LANE_S / FIXED_DELTA) and not any(c == car.id for _, c, _ in off_road):
+                        off_road.append((t, car.id, "ego" if car is ego else car.type_id))
                 history.push(world, ego, sim_time=world.get_snapshot().timestamp.elapsed_seconds)
                 fs.write(json.dumps(history.buffer[-1]) + "\n")
                 if t % 100 == 0:
                     print(f"tick {t}/{p.n_ticks}" + (f"  injections {injector.n_visible} on screen / {len(injector.done)}" if injector else "")
-                          + (f"  replans {track.replans}  jam cars removed {jam_removed}" if track else "")
+                          + f"  replans {track.replans}"
                           + (f"  walkers frozen {len(frozen)}" if freeze else ""), flush=True)
         (out / "actors.json").write_text(json.dumps(actors))
         info = json.loads((out / "run_info.json").read_text())
-        (out / "run_info.json").write_text(json.dumps({**info, "n_walkers_frozen": len(frozen), **({"n_replans": track.replans, "n_jam_cars_removed": jam_removed} if track else {})}))
+        (out / "run_info.json").write_text(json.dumps({**info, "n_walkers_frozen": len(frozen), "n_replans": track.replans}))
         if injector is not None:
             inj = injector.close(p.n_ticks)
             windows = [[r["onset"], r["offset"]] for r in inj if r["visible"]]
-            ok = len(windows) >= P.INJECTIONS
+            ok = len(windows) >= injector.n
             (out / "anomalies.json").write_text(json.dumps({
                 "anomaly_type": "semantic", "kind": p.kind, "success": ok, "n_frames": p.n_ticks, "n_injected": len(inj),
                 "windows": windows, "onset_frame": windows[0][0] if windows else None, "offset_frame": windows[-1][1] if windows else None,
@@ -490,7 +669,12 @@ def record(p: P.Plan, seed: int) -> int:
             print(f"{p.kind}: {len(windows)} of {len(inj)} injections on screen", flush=True)
             if not ok:
                 status = 3
-                print(f"FAILED: fewer than {P.INJECTIONS} {p.kind} injections came on screen", flush=True)
+                print(f"FAILED: the {p.kind} anomaly was not clearly on screen", flush=True)
+        if crashes or off_road:
+            (out / "collisions.json").write_text(json.dumps({"collisions": crashes, "off_lane": off_road}))
+            status = 3
+            print(f"FAILED: {len(crashes)} collision events {sorted(set((a, b) for _, a, b in crashes))[:5]}, "
+                  f"{len(off_road)} cars off their lanes {off_road[:5]}", flush=True)
         if flying:
             (out / "airborne.json").write_text(json.dumps(flying))
             status = 3
@@ -498,12 +682,16 @@ def record(p: P.Plan, seed: int) -> int:
     finally:
         for c, _ in cams:
             c.stop()
+        for c in sensors:
+            c.stop()
         if cams:
             world.tick()
         for c in controllers:
             c.stop()
         live = injector.cur["actors"] if injector is not None and injector.cur is not None else []
-        doomed = [c for c, _ in cams] + controllers + walkers + vehicles + props + (track.props if track else []) + live + [a for a in (lead, ego) if a is not None]
+        if live:   # a run that ended mid-injection: show the town's objects its scene hid
+            world.enable_environment_objects(set(injector.cur["hidden"]), True)
+        doomed = [c for c, _ in cams] + sensors + controllers + walkers + vehicles + (track.props if track else []) + live + [a for a in (lead, ego) if a is not None]
         client.apply_batch_sync([carla.command.DestroyActor(a) for a in doomed])
         settings.synchronous_mode, settings.fixed_delta_seconds = False, None
         world.apply_settings(settings)
@@ -516,7 +704,7 @@ def done(p: P.Plan) -> bool:
     d = OUT / p.name
     if not (d / "camera.jsonl").exists() or len((d / "camera.jsonl").read_text().splitlines()) != p.n_ticks:
         return False
-    if (d / "airborne.json").exists():
+    if (d / "airborne.json").exists() or (d / "collisions.json").exists():
         return False
     a = d / "anomalies.json"
     return not a.exists() or json.loads(a.read_text()).get("success", False)
@@ -525,7 +713,7 @@ def done(p: P.Plan) -> bool:
 def gt_windows(name: str, a: dict) -> list | None:
     """Each injection's window from the ground truth (concepts_gt_raw.jsonl): first to last tick in which the ground
     truth sees any of its actors (the pedestrian: on the road), so no frame naming the anomaly counts as nominal; at
-    least P.MIN_VISIBLE_TICKS of them. None before extract_gt_concepts.py has run."""
+    least P.GT_WINDOW_MIN_TICKS of them. None before extract_gt_concepts.py has run."""
     path = OUT / name / "concepts_gt_raw.jsonl"
     if not path.exists() or "injections" not in a:
         return None
@@ -539,15 +727,16 @@ def gt_windows(name: str, a: dict) -> list | None:
     out = []
     for inj in a["injections"]:
         ticks = sorted(t for x in inj["actors"] for t in seen.get(x["id"] & 0xFFFF, []) if inj["start"] <= t < inj["end"])
-        if len(ticks) >= P.MIN_VISIBLE_TICKS:
+        if len(ticks) >= P.GT_WINDOW_MIN_TICKS:
             out.append([ticks[0], ticks[-1] + 1])
     return out
 
 
 def write_configs() -> None:
-    """config/data_semantic24_long.json (withheld routes) and config/data_semantic24_long_incl.json (included routes)."""
+    """config/data_semantic24.json: the withheld-routes pool, the held-out nominal run and the anomaly runs with their
+    windows (score.py and the dashboard read the windows; the pools themselves come from sim/semantic24.plan())."""
     # paths relative to multimodal-ood-detection/, like its own data configs, so its scoring and dashboard code read them as-is
-    entry = lambda name: {"run_name": name, "data_path": f"aesop_recreate/data/semantic24_long/{name}", "out_path": f"aesop_recreate/data/semantic24_long/{name}/embeddings"}  # noqa: E731
+    entry = lambda name: {"run_name": name, "data_path": f"aesop_recreate/data/{P.DATASET}/{name}", "out_path": f"aesop_recreate/data/{P.DATASET}/{name}/embeddings"}  # noqa: E731
     runs = P.plan()
     anomaly = []
     for p in runs:
@@ -559,11 +748,11 @@ def write_configs() -> None:
             w = gt or a.get("windows", [[a["onset_frame"], a["offset_frame"]]])
             anomaly.append({**entry(p.name), "onset_tick": w[0][0], "offset_tick": w[-1][1], "windows": w,
                             "windows_from": "ground truth" if gt else "recorder", "anomaly_type": "semantic", "anomaly_kind": p.kind})
-    for pool, path in (("withheld", "data_semantic24_long.json"), ("included", "data_semantic24_long_incl.json")):
-        cfg = {"reference_runs": [entry(p.name) for p in runs if pool in p.pools], "negative_runs": [entry("t2_test_nominal")],
-               "anomaly_runs": anomaly, "replay_twin": False}
-        (ROOT / "config" / path).write_text(json.dumps(cfg, indent=2))
-        print(f"wrote config/{path}: {len(cfg['reference_runs'])} reference, 1 negative, {len(anomaly)} anomaly runs")
+    path = f"data_{P.DATASET}.json"
+    cfg = {"reference_runs": [entry(p.name) for p in runs if "withheld" in p.pools], "negative_runs": [entry("t2_test_nominal")],
+           "anomaly_runs": anomaly, "replay_twin": False}
+    (ROOT / "config" / path).write_text(json.dumps(cfg, indent=2))
+    print(f"wrote config/{path}: {len(cfg['reference_runs'])} reference, 1 negative, {len(anomaly)} anomaly runs")
 
 
 def main():
@@ -587,7 +776,7 @@ def main():
                     restart_carla(log)
                 t0 = time.time()
                 try:
-                    rc = subprocess.run([sys.executable, __file__, p.name, "--seed", str(seed)], timeout=LONG_RUN_TIMEOUT_S if p.long else RUN_TIMEOUT_S,
+                    rc = subprocess.run([sys.executable, __file__, p.name, "--seed", str(seed)], timeout=RUN_TIMEOUT_S,
                                         stdout=log.open("a"), stderr=subprocess.STDOUT).returncode
                 except subprocess.TimeoutExpired:
                     rc = -1
