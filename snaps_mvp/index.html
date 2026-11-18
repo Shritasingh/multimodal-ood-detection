@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>snaps_mvp</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root { --bg:#101214; --panel:#181b1f; --line:#2a2f36; --text:#e8eaed; --dim:#9aa0a6; --alert:#ff5c5c; --accent:#5aa9ff;
+          --green:#5fd38d; --amber:#ffb84d; }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui, sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:var(--panel); border-bottom:1px solid var(--line); padding:8px 16px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; }
+  .row + .row { margin-top:6px; }
+  h1 { font-size:15px; margin:0; }
+  nav { display:flex; gap:4px; }
+  nav button { background:none; border:1px solid transparent; color:var(--dim); padding:5px 14px; border-radius:6px; font:inherit; cursor:pointer; }
+  nav button.on { color:var(--text); border-color:var(--line); background:var(--bg); }
+  select, button.ctl { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:4px 9px; font:inherit; }
+  button.ctl { cursor:pointer; } button.ctl:hover { border-color:var(--dim); }
+  input[type=range] { accent-color:var(--accent); }
+  #slider { flex:1; min-width:240px; }
+  main { padding:14px 16px; }
+  .tab { display:none; } .tab.on { display:block; }
+  .dim { color:var(--dim); } .alert { color:var(--alert); }
+  .chip { padding:2px 9px; border-radius:10px; border:1px solid var(--line); color:var(--dim); font-size:12px; white-space:nowrap; }
+  .grid2 { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:14px; align-items:start; }
+  @media (max-width:1100px) { .grid2 { grid-template-columns:minmax(0, 1fr); } }
+  .cell { border:1px solid var(--line); border-radius:6px; padding:8px 10px; min-width:0; }
+  .cell h3 { margin:0 0 6px; font-size:13px; } .cell h3 .dim { font-weight:400; }
+  .cell .row { margin-bottom:6px; }
+  #canvas { width:100%; background:#000; border-radius:6px; display:block; }
+  #topdown { width:100%; display:block; border-radius:6px; }
+  .clist { display:flex; flex-wrap:wrap; gap:4px; }
+  .c { font-size:12px; padding:1px 8px; border-radius:10px; border:1px solid var(--line); white-space:nowrap; }
+  .c.closed { border-color:#5aa9ff; color:#5aa9ff; }
+  .c.green { border-color:var(--green); color:var(--green); } .c.amber { border-color:var(--amber); color:var(--amber); }
+  .c.red { border-color:var(--alert); color:var(--alert); }
+  #cell-knn { display:flex; flex-direction:column; }
+  #knn-list { flex:1; min-height:0; overflow:auto; }
+  .nb { border-top:1px solid var(--line); padding:8px 0; cursor:pointer; }
+  .nb:hover { background:rgba(232,234,237,.04); }
+  .nb .hd { display:flex; gap:10px; flex-wrap:wrap; align-items:baseline; margin-bottom:4px; }
+  .nb .pics { display:grid; grid-template-columns:minmax(0, 4fr) minmax(0, 3fr); gap:8px; align-items:start; }
+  .nb img { width:100%; border-radius:4px; display:block; }
+  .nb canvas { width:100%; border-radius:4px; display:block; }
+  .scores { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+  .plot3 { height:660px; }
+  .banner { margin:14px 16px 0; padding:10px 14px; border:1px solid var(--alert); color:var(--alert); border-radius:6px; }
+  table.xt { border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums; margin-top:8px; }
+  table.xt th, table.xt td { padding:4px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  table.xt th:first-child, table.xt td:first-child { text-align:left; }
+  table.xt th { color:var(--dim); font-weight:500; }
+  table.xt td.hot { color:var(--alert); } table.xt td.own { font-weight:700; }
+  table.xt th.l, table.xt td.l { text-align:left; } table.xt td.wrap { white-space:normal; }
+  h2 { font-size:14px; margin:0 0 4px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <h1>snaps_mvp</h1>
+    <label class="dim">dataset <select id="cache"></select></label>
+    <label class="dim">group <select id="group"></select></label>
+    <nav><button data-tab="images">Images</button><button data-tab="scores">Scores</button></nav>
+    <span class="chip" id="info"></span>
+    <span class="dim" id="status"></span>
+  </div>
+  <div class="row" id="ibar">
+    <button class="ctl" id="prev">◀</button>
+    <input type="range" id="slider" min="0" max="0" value="0">
+    <button class="ctl" id="next">▶</button>
+    <span class="chip" id="fr"></span>
+    <span class="dim">← → step (shift: 10)</span>
+  </div>
+</header>
+<div class="banner" id="banner" hidden></div>
+<main>
+  <section id="images" class="tab">
+    <div class="grid2">
+      <div class="cell" id="cell-frame">
+        <div class="row">
+          <label><input type="checkbox" id="show-heat" checked> DINO patch heatmap</label>
+          <label class="dim">max <input type="range" id="vmax" min="0.02" max="0.8" step="0.01" style="width:90px"> <span id="vmax-v"></span></label>
+          <label><input type="checkbox" id="show-box" checked> object label boxes</label>
+        </div>
+        <canvas id="canvas"></canvas>
+        <div class="dim" id="frame-key" style="margin-top:4px;font-size:12px"></div>
+      </div>
+      <div class="cell" id="cell-knn">
+        <div class="row"><b>kNN neighbours</b><span id="kreps"></span></div>
+        <div class="dim" id="knn-h" style="font-size:12px"></div>
+        <div id="knn-list"></div>
+      </div>
+      <div class="cell" id="cell-scores">
+        <h3>Scores per representation <span class="dim" id="plot-h"></span></h3>
+        <div class="scores" id="scorechips"></div>
+        <div id="iplot" class="plot3"></div>
+      </div>
+      <div class="cell" id="cell-sem">
+        <h3>Semantic labels <span class="dim">· ground-truth concepts of every agent with ≥ <span id="vpx"></span> visible pixels · hover to highlight its box</span></h3>
+        <div id="labels"></div>
+        <h3 style="margin-top:12px">Physics <span class="dim" id="phys-h"></span></h3>
+        <canvas id="topdown"></canvas>
+      </div>
+    </div>
+  </section>
+  <section id="scores" class="tab">
+    <h2>Results <span class="dim" id="res-h"></span></h2>
+    <div id="res"></div>
+  </section>
+</main>
+<script>window.STATIC_SITE = true;</script>
+<script>
+const $ = id => document.getElementById(id);
+const S = {index:null, cache:null, group:null, pos:0, tab:"images", rep:"vision", data:null, hi:null, img:new Image(), vmax:null};
+const METRIC = {physics:"neighbours by PLAIN Euclidean distance, k = 5 (the physics_euclid score's; the standardised physics score uses the same cache, scaled per dimension)", physics_euclid:"plain Euclidean, k = 5", semantic:"cosine (e5-Mistral), sentence cache", vision:"DINOv2 patches, k = 1, worst 15 %"};
+const SHORT = {physics:"p", physics_euclid:"pE", semantic:"s", vision:"v"};
+const layout = (extra = {}) => ({paper_bgcolor:"#101214", plot_bgcolor:"#101214", font:{color:"#e8eaed", size:11}, margin:{l:55, r:10, t:10, b:35},
+  legend:{orientation:"h", y:1.12, itemclick:false, itemdoubleclick:false}, ...extra});
+const CFG = {displayModeBar:false, responsive:true};
+const colour = r => S.index.colors[r];
+const pad = t => String(t).padStart(4, "0");
+const C = () => S.index.caches[S.cache];
+const G = () => C().groups.find(g => g.name === S.group);
+const f2 = x => x == null ? "–" : x.toFixed(2);
+const f3 = x => x == null ? "–" : (Math.abs(x) < 1e-3 && x !== 0 ? x.toExponential(2) : x.toFixed(4));
+const objectOf = c => c.split(" ").slice(0, c.startsWith("traffic") ? 2 : 1).join(" ");
+const matchCls = (c, ref) => ref.has(c) ? "green" : [...ref].some(r => objectOf(r) === objectOf(c)) ? "amber" : "red";
+const KEY = `<span style="color:var(--green)">green</span> = same concept, <span style="color:var(--amber)">amber</span> = same object, other predicate, <span style="color:var(--alert)">red</span> = not in this frame`;
+
+// served by serve.py, or exported as static files by export_static.py (window.STATIC_SITE)
+const STATIC = !!window.STATIC_SITE;
+const ROOT = STATIC ? "" : "/";
+async function getJSON(url) {
+  if (STATIC) url = url === "/api/index" ? "api/index.json" : `${url.slice(1)}.json`;
+  const r = await fetch(url), j = await r.json();
+  if (!r.ok) { $("banner").hidden = false; $("banner").textContent = j.error || `error ${r.status}`; throw new Error(j.error); }
+  $("banner").hidden = true;
+  return j;
+}
+
+// ---------- navigation
+async function init() {
+  S.index = await getJSON("/api/index");
+  const I = S.index;
+  $("vpx").textContent = I.visible_px;
+  $("cache").innerHTML = Object.keys(I.caches).map(c => `<option value="${c}">${c}</option>`).join("");
+  $("kreps").innerHTML = I.reps.filter(r => r !== "physics_euclid").map(r => `<label><input type="radio" name="krep" value="${r}"> <span style="color:${colour(r)}">${r}</span></label>`).join(" ");
+  for (const b of document.querySelectorAll("input[name=krep]")) b.onchange = () => { S.rep = b.value; drawKnn(); drawCanvas(); saveHash(); };
+  for (const b of document.querySelectorAll("nav button")) b.onclick = () => setTab(b.dataset.tab);
+  $("cache").onchange = () => setCache($("cache").value);
+  $("group").onchange = () => setGroup($("group").value, 0);
+  $("slider").oninput = () => setPos(+$("slider").value);
+  $("prev").onclick = () => setPos(S.pos - 1); $("next").onclick = () => setPos(S.pos + 1);
+  $("vmax").oninput = () => { S.vmax = +$("vmax").value; $("vmax-v").textContent = S.vmax.toFixed(2); drawCanvas(); };
+  for (const id of ["show-box", "show-heat"]) $(id).onchange = drawCanvas;
+  document.addEventListener("keydown", ev => {
+    if (S.tab !== "images" || (["INPUT", "SELECT"].includes(ev.target.tagName) && ev.target.type !== "range")) return;
+    if (ev.key === "ArrowRight") { setPos(S.pos + (ev.shiftKey ? 10 : 1)); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft") { setPos(S.pos - (ev.shiftKey ? 10 : 1)); ev.preventDefault(); }
+  });
+  window.addEventListener("resize", () => { if (S.data) { drawTopdown($("topdown"), S.data.rec, S.data.slot, false); drawKnn(); syncKnnHeight(); } });
+  const [tab, cache, group, pos, rep] = location.hash.slice(1).split("/");
+  if (I.reps.includes(rep) && rep !== "physics_euclid") S.rep = rep;
+  document.querySelector(`input[name=krep][value=${S.rep}]`).checked = true;
+  await setCache(I.caches[cache] ? cache : Object.keys(I.caches)[0], group, +pos || 0);
+  setTab(tab === "scores" ? "scores" : "images");
+}
+async function setCache(cache, group, pos = 0) {
+  S.cache = cache; $("cache").value = cache;
+  $("group").innerHTML = C().groups.map(g => `<option value="${g.name}">${g.label} (${g.n})</option>`).join("");
+  S.vmax = C().vmax; $("vmax").value = S.vmax; $("vmax-v").textContent = S.vmax.toFixed(2);
+  await setGroup(C().groups.some(g => g.name === group) ? group : "nominal", pos);
+  if (S.tab === "scores") drawScoresTab();
+}
+async function setGroup(group, pos = 0) {
+  S.group = group; $("group").value = group;
+  $("slider").max = G().n - 1;
+  $("info").textContent = group === "nominal" ? `the ${C().n} nominal frames · each scored against the other ${C().n - 1} (leave-one-out)` : `scored against the ${C().n} nominal frames${S.group === "droplet" ? " (without its source frame)" : ""}`;
+  await setPos(Math.min(pos, G().n - 1));
+}
+async function setPos(p) {
+  p = Math.max(0, Math.min(p, G().n - 1)); S.pos = p; $("slider").value = p;
+  const key = `${S.cache}/${S.group}/${p}`; $("status").textContent = "loading…";
+  const data = await getJSON(`/api/frame/${key}`);
+  if (`${S.cache}/${S.group}/${S.pos}` !== key) return;
+  if (data.cache !== S.cache || data.group !== S.group || data.pos !== S.pos) return;
+  S.data = data; $("status").textContent = "";
+  draw();
+}
+function setTab(tab) {
+  S.tab = tab;
+  for (const b of document.querySelectorAll("nav button")) b.classList.toggle("on", b.dataset.tab === tab);
+  for (const s of document.querySelectorAll(".tab")) s.classList.toggle("on", s.id === tab);
+  $("ibar").hidden = tab !== "images";
+  if (tab === "scores") drawScoresTab(); else { drawPlot(); if (S.data) { drawTopdown($("topdown"), S.data.rec, S.data.slot, false); drawKnn(); } }
+  saveHash();
+}
+function saveHash() { history.replaceState(null, "", `#${S.tab}/${S.cache}/${S.group}/${S.pos}/${S.rep}`); }
+async function openFrame(group, pos) { if (group !== S.group) await setGroup(group, pos); else await setPos(pos); if (S.tab !== "images") setTab("images"); }
+
+// ---------- Images tab
+function draw() {
+  const d = S.data;
+  $("fr").innerHTML = `#${d.pos} · ${d.dir}/${pad(d.idx)} · ${d.rec.plan.note}${d.rec.shift ? ` · <span class="alert">ANOMALY</span>` : ""}`;
+  drawLabels(); drawScoreChips(); drawKnn(); drawPlot();
+  drawTopdown($("topdown"), d.rec, d.slot, false);
+  const src = `${ROOT}data/${S.cache}/${d.dir}/frames/${pad(d.idx)}.jpg?v=${S.index.version}`;
+  if (!S.img.src.endsWith(src)) { S.img.onload = drawCanvas; S.img.src = src; } else drawCanvas();
+  saveHash();
+}
+
+function drawScoreChips() {
+  const d = S.data, I = S.index;
+  $("scorechips").innerHTML = I.reps.map(r => { const s = d.scores[r], hot = s.s > s.tau;
+    return `<span class="chip" style="border-color:${colour(r)}"><span style="color:${colour(r)}">${r}</span> ${f3(s.s)} · tau ${f3(s.tau)}${hot ? ` · <span class="alert">FLAGGED</span>` : ""}</span>`; }).join("");
+}
+
+function drawLabels() {
+  const d = S.data;
+  const chips = d.desc.split(" · ").map(c => `<span class="c closed" data-c="${c}">${c}</span>`).join("");
+  $("labels").innerHTML = `<div class="clist" id="gtc">${chips}</div>
+    <div style="margin-top:6px">semantic input (the labels in one sentence): “${d.sentence}” · <span class="dim">${d.same_desc} of the ${C().n} nominal frames have this sentence${S.group === "nominal" ? " (incl. this one)" : ""}</span></div>`;
+  for (const el of document.querySelectorAll("#gtc .c")) {
+    el.onmouseenter = () => { S.hi = el.dataset.c; drawCanvas(); };
+    el.onmouseleave = () => { S.hi = null; drawCanvas(); };
+  }
+  $("phys-h").textContent = `· the encoder's input, top-down in the ego frame (heading up) · dot = agent now, arrow = velocity × 1 s, trail = its ${S.index.history} history steps · colour = role slot · grey = lane routes, boxes = crosswalks, shaded = camera view · rings every 10 m`;
+}
+
+// an agent's 3D box (recorded pose + its actor bounding box) projected into the front camera (agents without a mask box)
+function projectBox(o, a, e) {
+  const Cm = S.index.camera, [ex, ey, ez, ox, oy, oz] = a.bb;
+  const f = Cm.width / (2 * Math.tan(Cm.fov * Math.PI / 360)), cy = Math.cos(e.yaw), sy = Math.sin(e.yaw);
+  const cx = e.x + Cm.x * cy, cyy = e.y + Cm.x * sy, cz = e.z + Cm.z, c = Math.cos(o.yaw), s = Math.sin(o.yaw), pts = [];
+  for (const u of [-1, 1]) for (const v of [-1, 1]) for (const w of [-1, 1]) {
+    const lx = ox + u * ex, ly = oy + v * ey;
+    const px = o.x + lx * c - ly * s - cx, py = o.y + lx * s + ly * c - cyy, pz = o.z + oz + w * ez - cz;
+    const fw = px * cy + py * sy, rt = -px * sy + py * cy;
+    if (fw < 0.3) return null;
+    pts.push([Cm.width / 2 + f * rt / fw, Cm.height / 2 - f * pz / fw]);
+  }
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const b = [Math.max(0, Math.min(...xs)), Math.max(0, Math.min(...ys)), Math.min(Cm.width, Math.max(...xs)), Math.min(Cm.height, Math.max(...ys))];
+  return b[2] > b[0] && b[3] > b[1] ? b : null;
+}
+// magma-like ramp for the patch heatmap
+const RAMP = [[0, 0, 4], [59, 15, 112], [140, 41, 129], [222, 73, 104], [254, 159, 109], [252, 253, 191]];
+function ramp(t) { t = Math.max(0, Math.min(1, t)) * (RAMP.length - 1); const i = Math.min(Math.floor(t), RAMP.length - 2), f = t - i;
+  return RAMP[i].map((v, j) => Math.round(v + (RAMP[i + 1][j] - v) * f)); }
+function drawCanvas() {
+  const cv = $("canvas"), img = S.img, d = S.data;
+  if (!img.naturalWidth || !d) return;
+  cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+  const g = cv.getContext("2d");
+  g.drawImage(img, 0, 0);
+  const [gh, gw] = S.index.grid, pw = cv.width / gw, ph = cv.height / gh;
+  $("frame-key").textContent = $("show-heat").checked ? `heatmap: each of the ${gh} × ${gw} patches' cosine distance to its nearest nominal patch (colour and opacity grow with it, full at max) · outlined = this frame's ${S.index.knn_patches} worst patches (config scoring.vision_knn_patches; the vision kNN uses the same ones) · the vision score is the mean of the worst ${Math.round(S.index.top_frac * 100)} %` : "";
+  if ($("show-heat").checked) {
+    const m = d.map, nW = Math.max(1, Math.min(S.index.knn_patches, m.length)), cut = [...m].sort((a, b) => b - a)[nW - 1];
+    const [o0, o1] = S.index.heat_opacity;
+    for (let i = 0; i < m.length; i++) {      // magma-like ramp; opacity grows with the distance over config dashboard.heat_opacity
+      const t = Math.max(0, Math.min(1, m[i] / S.vmax)), [r, gg, b] = ramp(t);
+      g.fillStyle = `rgba(${r},${gg},${b},${o0 + (o1 - o0) * t})`;
+      g.fillRect((i % gw) * pw, Math.floor(i / gw) * ph, pw, ph);
+    }
+    g.strokeStyle = "rgba(255,255,255,.85)"; g.lineWidth = 1.2;
+    for (let i = 0; i < m.length; i++) if (m[i] >= cut) g.strokeRect((i % gw) * pw + 0.5, Math.floor(i / gw) * ph + 0.5, pw - 1, ph - 1);
+  }
+  pairsOnFrame(g, pw, ph);
+  if (!$("show-box").checked) return syncKnnHeight();
+  g.font = "12px system-ui";
+  const st = d.rec.history[d.rec.history.length - 1], shiftedType = S.index.shifted[d.group];
+  for (const o of st.others) {
+    const a = d.rec.agents[String(o.id)], lp = d.last[String(o.id)] || {}, c = `${a.obj} ${lp.pred}`;
+    if ((lp.px || 0) < S.index.visible_px) continue;                       // only agents visible on the frame
+    if (S.hi && c !== S.hi) continue;
+    const b = lp.box ? [lp.box[0], lp.box[1], lp.box[2] + 1, lp.box[3] + 1] : projectBox(o, a, st.ego); if (!b) continue;   // its instance-mask box
+    const role = d.slot[String(o.id)];
+    const col = a.type === shiftedType ? "#ff5c5c" : a.type === "pedestrian" ? "#ffb84d" : "#5aa9ff", strong = S.hi === c;
+    g.strokeStyle = col; g.lineWidth = strong ? 3 : 1.8;
+    g.strokeRect(b[0], b[1], b[2] - b[0], b[3] - b[1]);
+    const label = `${o.id} ${a.obj}${role ? ` · ${role}` : ""} · ${lp.px} px`, w = g.measureText(label).width + 6;
+    const y = b[1] > 16 ? b[1] - 15 : b[3];
+    g.fillStyle = strong ? col : "rgba(16,18,20,.8)"; g.fillRect(b[0], y, w, 15);
+    g.fillStyle = strong ? "#101214" : col; g.fillText(label, b[0] + 3, y + 12);
+  }
+  syncKnnHeight();
+}
+// the kNN cell is as tall as the frame cell beside it; its list scrolls
+function syncKnnHeight() {
+  if (window.innerWidth <= 1100) { $("cell-knn").style.height = ""; return; }
+  $("cell-knn").style.height = $("cell-frame").offsetHeight + "px";
+}
+
+// anomaly frames, vision kNN: neighbour j's colour outlines the patches it supplied (on its tile) and the outlined patches of
+// this frame they matched (on the frame)
+const PAIR_COL = ["#ffd400", "#00e5ff", "#ff4fd8", "#7cfc00", "#ff8c1a"];
+function pairSvg(n, j) {
+  if (!n.pairs || !n.pairs.length) return "";
+  const [gh, gw] = S.index.grid, col = PAIR_COL[j % PAIR_COL.length];
+  return `<svg viewBox="0 0 ${gw} ${gh}" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">${
+    n.pairs.map(([, b]) => `<rect x="${b % gw + 0.06}" y="${Math.floor(b / gw) + 0.06}" width="0.88" height="0.88" fill="none" stroke="${col}" stroke-width="2.2" vector-effect="non-scaling-stroke"/>`).join("")}</svg>`;
+}
+function pairsOnFrame(g, pw, ph) {
+  const rows = S.rep === "vision" && S.data.knn.vision;
+  if (!rows || !rows.some(n => n.pairs)) return;
+  const gw = S.index.grid[1];
+  g.lineWidth = 2.5;
+  rows.forEach((n, j) => { g.strokeStyle = PAIR_COL[j % PAIR_COL.length];
+    for (const [a] of n.pairs || []) g.strokeRect((a % gw) * pw + 1.5, Math.floor(a / gw) * ph + 1.5, pw - 3, ph - 3); });
+}
+
+// ---------- kNN neighbours: per representation; each tile = frame, colour-coded concepts, top-down physics
+function drawKnn() {
+  if (!S.data) return;
+  if (S.rep === "semantic") return drawKnnLabels();
+  const r = S.rep, d = S.data, rows = d.knn[r], mine = new Set(d.rec.concepts);
+  const what = r === "vision" ? `the nominal frames holding the nearest patches of this frame's ${S.index.knn_patches} outlined worst patches (largest overlap first; distance = the mean of those patches' distances)`
+    : `the ${S.index.k} nearest entries of the physics cache (each distinct nominal physics vector once; shown with one of the nominal frames that has it)`;
+  const pairsKey = r === "vision" && rows.some(n => n.pairs) ? " · coloured squares: the patches each neighbour supplied (on its tile) and the outlined patches of this frame they matched (same colour on the frame; white = supplied by a frame outside these 5)" : "";
+  $("knn-h").innerHTML = `<span style="color:${colour(r)}">${r}</span> · ${METRIC[r]} · ${what}${S.group === "nominal" ? " · this frame left out" : ""}${pairsKey} · chips: ${KEY}`;
+  $("knn-list").innerHTML = rows.map((n, j) => `<div class="nb" data-p="${n.pos}">
+      <div class="hd"><b ${n.pairs ? `style="color:${PAIR_COL[j % PAIR_COL.length]}"` : ""}>${j + 1}</b><span>nominal #${n.pos}</span><span class="dim">${n.patches != null ? `${n.patches} of ${S.index.knn_patches} patches · ` : ""}${n.same > 1 ? `shared by ${n.same} nominal frames · ` : ""}distance ${f3(n.d)}${n.d === 0 ? " · identical" : ""} · its own scores: ${S.index.reps.map(q => `<span style="color:${colour(q)}">${SHORT[q] ?? q[0]}</span> ${f3(n.s[q])}`).join(" ")}</span></div>
+      <div class="pics"><div style="position:relative"><img loading="lazy" src="${ROOT}data/${S.cache}/nominal/frames/${pad(n.idx)}.jpg?v=${S.index.version}">${pairSvg(n, j)}</div><canvas id="nbtd-${j}"></canvas></div>
+      <div class="clist" style="margin-top:6px">${n.concepts.map(c => `<span class="c ${matchCls(c, mine)}">${c}</span>`).join("") || `<span class="dim">empty intersection</span>`}</div></div>`).join("");
+  rows.forEach((n, j) => drawTopdown($(`nbtd-${j}`), n.rec, n.slot, true));
+  for (const nb of $("knn-list").querySelectorAll(".nb")) nb.onclick = () => openFrame("nominal", +nb.dataset.p);
+}
+
+// semantic neighbours: the cache is a set of sentences (the nominal frames' distinct sentences + one per added label), not frames
+function drawKnnLabels() {
+  const d = S.data, rows = d.knn.semantic, mine = new Set(d.desc.split(" · "));
+  const src = c => [c.frames ? `${c.frames} nominal frame${c.frames === 1 ? "" : "s"}` : "", c.added ? "added label" : ""].filter(Boolean).join(" + ");
+  const chips = ls => ls.map(l => `<span class="c ${matchCls(l, mine)}">${l}</span>`).join("");
+  $("knn-h").innerHTML = `<span style="color:${colour("semantic")}">semantic</span> · each frame's labels concatenated into one sentence, embedded with e5-Mistral · the ${S.index.k} cache sentences nearest to this frame's (score = cosine distance to the nearest ${S.index.metrics.semantic_k ?? 1})${S.group === "nominal" ? " · this frame's own copy left out" : ""} · chips: ${KEY}`;
+  $("knn-list").innerHTML = `<div style="margin:6px 0 2px">this frame: “${d.sentence}”</div>
+    <table class="xt" style="margin-top:8px"><tr><th>#</th><th class="l">cache sentence (its labels)</th><th>cosine distance</th><th class="l">source</th></tr>${rows.map((n, j) =>
+      `<tr><td>${j + 1}</td><td class="l wrap">“${n.sentence}”<div class="clist" style="margin-top:3px">${chips(n.labels)}</div></td><td>${n.d == null ? "left out" : f3(n.d)}</td><td class="l wrap dim">${src(n)}</td></tr>`).join("")}</table>
+    <div class="dim" style="margin:12px 0 4px">the whole semantic cache (${C().sem_cache.length} sentences):</div>
+    <table class="xt">${C().sem_cache.map(c => `<tr><td class="l wrap">“${c.sentence}”</td><td class="l dim">${src(c)}</td></tr>`).join("")}</table>`;
+}
+
+// ---------- plot: every frame of the dataset (groups side by side), one panel per representation, z-scored
+function drawPlot() {
+  if (S.tab !== "images" || !S.data) return;
+  const I = S.index, groups = C().groups, reps = I.reps, n = reps.length;
+  let x0 = 0; const offs = {};
+  const sep = Math.max(8, Math.round(0.12 * Math.max(...groups.map(g => g.n))));   // room for the group labels
+  for (const g of groups) { offs[g.name] = x0; x0 += g.n + sep; }
+  $("plot-h").textContent = `· raw scores (physics: standardised Euclidean kNN distance; physics_euclid: plain Euclidean kNN distance; semantic: cosine distance of the frame's sentence to the nearest cache sentence; vision: mean of the worst ${Math.round(S.index.top_frac * 100)} % patch distances) · dashed = conformal threshold (nominal frames: from the other nominal frames) · ringed = above it · ◆ = this frame · click a point to open it`;
+  const gap = 0.05, h = (1 - gap * (n - 1)) / n, lay = layout({showlegend:false, margin:{l:55, r:10, t:22, b:20}, hovermode:"closest"}), shapes = [], ann = [], traces = [];
+  reps.forEach((r, j) => {
+    const ax = j ? `yaxis${j + 1}` : "yaxis", ya = j ? `y${j + 1}` : "y", lo = 1 - (j + 1) * h - j * gap;
+    lay[ax] = {gridcolor:"#2a2f36", domain:[lo, lo + h], title:{text:`${r}`, font:{color:colour(r)}}, zeroline:true, zerolinecolor:"#2a2f36"};
+    for (const g of groups) {
+      const xs = [...Array(g.n).keys()].map(i => offs[g.name] + i);
+      traces.push({x:xs, y:g.s[r], yaxis:ya, mode:"markers", customdata:xs.map((_, i) => [g.name, i, g.idx[i]]),
+        marker:{size:5, color:colour(r), opacity:.75, line:{width:g.above[r].map(a => a ? 1.5 : 0), color:"#ff5c5c"}},
+        hovertemplate:`${g.name} #%{customdata[1]} (%{customdata[2]})<br>${r} %{y:.4g}<extra></extra>`});
+      traces.push({x:xs, y:g.tau[r], yaxis:ya, mode:"lines", line:{color:colour(r), dash:"dash", width:1.2}, hoverinfo:"skip"});
+    }
+    const cur = groups.find(g => g.name === S.group);
+    traces.push({x:[offs[S.group] + S.pos], y:[cur.s[r][S.pos]], yaxis:ya, mode:"markers", marker:{symbol:"diamond", size:12, color:"#e8eaed", line:{color:"#101214", width:1}}, hoverinfo:"skip"});
+  });
+  groups.forEach((g, k) => {
+    if (k % 2) shapes.push({type:"rect", xref:"x", yref:"paper", x0:offs[g.name] - 4, x1:offs[g.name] + g.n + 4, y0:0, y1:1, fillcolor:"rgba(232,234,237,.035)", line:{width:0}});
+    ann.push({x:offs[g.name] + g.n / 2, y:1.0, xref:"x", yref:"paper", yanchor:"bottom", showarrow:false, text:g.name, font:{color:g.name === S.group ? "#e8eaed" : "#9aa0a6", size:11}});
+  });
+  lay.xaxis = {gridcolor:"#2a2f36", zeroline:false, showticklabels:false, anchor:n > 1 ? `y${n}` : "y", range:[-6, x0 - 2]};
+  lay.shapes = shapes; lay.annotations = ann;
+  Plotly.react("iplot", traces, lay, CFG); Plotly.Plots.resize("iplot");
+  const el = $("iplot"); el.removeAllListeners?.("plotly_click");
+  el.on("plotly_click", ev => { const p = ev.points.find(q => q.customdata); if (p) openFrame(p.customdata[0], p.customdata[1]); });
+}
+
+// ---------- the physics view: top-down in the ego frame (as analysis/physics_topdown.py); compact = a kNN tile
+const ROLE_COL = {agent:"#ff9f43", lead:"#ff9f43", follower:"#a29bfe", left:"#48dbfb", right:"#1dd1a1", oncoming:"#f368e0", crossing:"#feca57", pedestrian:"#ff7675"};
+function drawTopdown(cv, rec, slot, compact) {
+  if (!cv || !rec) return;
+  const G = S.index.geometry, hist = rec.history, ego = hist[hist.length - 1].ego;
+  const W = cv.clientWidth || 300, H = Math.round(W * (compact ? 0.9 : 0.6)), dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.height = H + "px";
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = "#0b0d0f"; g.fillRect(0, 0, W, H);
+  const X0 = -8, X1 = 62, sc = H / (X1 - X0), cx = W / 2, cy = H + X0 * sc;   // forward range shown: X0 .. X1 m
+  const c = Math.cos(ego.yaw), sn = Math.sin(ego.yaw);
+  const ef = (wx, wy) => { const dx = wx - ego.x, dy = wy - ego.y; return [dx * c + dy * sn, -dx * sn + dy * c]; };   // world -> (forward, right)
+  const P = (f, r) => [cx + r * sc, cy - f * sc];
+  const PW = (wx, wy) => P(...ef(wx, wy));
+  const fov = S.index.camera.fov * Math.PI / 360, cam = S.index.camera.x, far = 120;   // camera view
+  g.beginPath(); g.moveTo(...P(cam, 0)); g.lineTo(...P(cam + far * Math.cos(fov), -far * Math.sin(fov))); g.lineTo(...P(cam + far * Math.cos(fov), far * Math.sin(fov))); g.closePath();
+  g.fillStyle = "rgba(232,234,237,.05)"; g.fill();
+  g.setLineDash([4, 4]); g.strokeStyle = "rgba(232,234,237,.25)"; g.lineWidth = 1; g.stroke(); g.setLineDash([]);
+  g.font = "10px system-ui, sans-serif";
+  for (let r = 10; r <= 60; r += 10) { g.beginPath(); g.arc(...P(0, 0), r * sc, 0, 2 * Math.PI); g.strokeStyle = "#1f242a"; g.stroke();
+    if (!compact) { g.fillStyle = "#5f6670"; g.fillText(`${r} m`, cx + 3, cy - r * sc - 3); } }
+  g.strokeStyle = "#2c323a"; g.lineWidth = 1;
+  for (const pts of Object.values(G.routes)) { g.beginPath(); pts.forEach((q, i) => (i ? g.lineTo : g.moveTo).call(g, ...PW(q[0], q[1]))); g.stroke(); }
+  g.strokeStyle = "#4a525c"; g.fillStyle = "rgba(232,234,237,.04)";
+  for (const q of G.crosswalks) { g.beginPath(); q.forEach((p, i) => (i ? g.lineTo : g.moveTo).call(g, ...PW(p[0], p[1]))); g.closePath(); g.fill(); g.stroke(); }
+  const [ex, ey] = P(0, 0);
+  g.fillStyle = "#e8eaed"; g.fillRect(ex - 1.0 * sc, ey - 2.4 * sc, 2.0 * sc, 4.8 * sc);
+  if (!compact) g.fillText("ego (parked)", ex + 1.4 * sc + 4, ey + 4);
+  const arrow = (f, r, vf, vr, secs, col, w, tip) => {
+    const [x0, y0] = P(f, r), [x1, y1] = P(f + vf * secs, r + vr * secs), L = Math.hypot(x1 - x0, y1 - y0);
+    if (L < 1) return;
+    g.strokeStyle = col; g.fillStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+    const a = Math.atan2(y1 - y0, x1 - x0), t = Math.min(tip, L * 0.5);
+    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x1 - t * Math.cos(a - 0.45), y1 - t * Math.sin(a - 0.45)); g.lineTo(x1 - t * Math.cos(a + 0.45), y1 - t * Math.sin(a + 0.45)); g.closePath(); g.fill();
+  };
+  const ids = [...new Set(hist.flatMap(h => h.others.map(o => o.id)))];
+  for (const id of ids) {
+    const role = slot[String(id)], col = ROLE_COL[role] || "#8b929b", a = rec.agents[String(id)] || {};
+    const st = hist.map(h => h.others.find(o => o.id === id)).map(o => o && {o, p: ef(o.x, o.y), v: ef(ego.x + o.vx, ego.y + o.vy)});
+    st.forEach((q, k) => { if (q && k < st.length - 1) arrow(q.p[0], q.p[1], q.v[0], q.v[1], 0.1, col + "80", 1, 4); });
+    const cur = st[st.length - 1]; if (!cur) continue;
+    const yaw = cur.o.yaw - ego.yaw, [ax, ay] = P(...cur.p);
+    g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.moveTo(ax, ay); g.lineTo(...P(cur.p[0] + 1.8 * Math.cos(yaw), cur.p[1] + 1.8 * Math.sin(yaw))); g.stroke();
+    arrow(cur.p[0], cur.p[1], cur.v[0], cur.v[1], 1.0, col, compact ? 1.5 : 2, compact ? 6 : 8);
+    g.fillStyle = col; g.beginPath(); g.arc(ax, ay, compact ? 3 : 4, 0, 2 * Math.PI); g.fill();
+    const sp = Math.hypot(cur.o.vx, cur.o.vy);
+    g.font = compact ? "10px system-ui, sans-serif" : "11px system-ui, sans-serif";
+    const label = compact ? `${role ?? "no role"} · ${sp.toFixed(1)} m/s` : `${role ?? "no role"} · ${a.obj ?? ""} ${id} · ${sp.toFixed(1)} m/s · (${cur.p[0].toFixed(1)}, ${cur.p[1].toFixed(1)}) m`;
+    const tw = g.measureText(label).width;
+    g.fillStyle = col; g.fillText(label, Math.max(2, Math.min(ax + 8, W - tw - 2)), Math.max(ay - 7, 11));
+  }
+  if (!ids.length) { g.fillStyle = "#8b929b"; g.font = (compact ? "10px" : "12px") + " system-ui, sans-serif"; g.fillText("no agents (all role slots zero)", 6, 14); }
+}
+
+// ---------- Scores tab
+function drawScoresTab() {
+  const M = S.index.metrics, reps = S.index.reps, cm = M.caches[S.cache], own = S.index.own;
+  $("res-h").textContent = `· ${S.cache} dataset · ${cm.n} nominal frames · conformal q = ${M.q} · z by the nominal leave-one-out mean / std · bold = the anomaly's own representation`;
+  let t = `<table class="xt"><tr><th>anomaly</th><th>rep</th><th>score</th><th>tau</th><th>z</th><th>tau z</th><th>above tau</th><th>nominal frames below</th></tr>`;
+  for (const [g, gm] of Object.entries(cm.groups)) {
+    if (g === "nominal") continue;
+    for (const r of reps) { const x = gm[r], o = own[g] === r ? "own" : "";
+      t += `<tr><td>${C().groups.find(q => q.name === g)?.label ?? g}</td><td class="${o}" style="color:${colour(r)}">${r}</td><td class="${o}">${x.score.toPrecision(4)}</td><td>${x.tau.toPrecision(4)}</td>
+        <td class="${o}">${x.z.toFixed(2)}</td><td>${x.tau_z.toFixed(2)}</td><td class="${o} ${x.above ? "hot" : ""}">${x.above ? "yes" : "no"}</td><td>${(100 * x.below).toFixed(1)} %</td></tr>`; }
+  }
+  const nm = cm.groups.nominal;
+  $("res").innerHTML = t + `</table><p class="dim">nominal false alarms (leave-one-out, share above its own tau): ${reps.map(r => `${r} ${(100 * nm[r].above).toFixed(1)} %`).join(" · ")}
+    · nominal mean / std: ${reps.map(r => `${r} ${cm.stats[r].mean.toPrecision(3)} / ${cm.stats[r].std.toPrecision(3)}`).join(" · ")}</p>`;
+}
+
+init().catch(e => console.error(e));
+</script>
+</body>
+</html>

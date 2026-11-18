@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>runs_aesop</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root { --bg:#101214; --panel:#181b1f; --line:#2a2f36; --text:#e8eaed; --dim:#9aa0a6; --alert:#ff5c5c; --accent:#5aa9ff;
+          --green:#5fd38d; --amber:#ffb84d; }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }   /* .row / .sec set display, which would override the hidden attribute */
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui, sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:var(--panel); border-bottom:1px solid var(--line); padding:8px 16px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; }
+  .row + .row { margin-top:6px; }
+  h1 { font-size:15px; margin:0; }
+  nav { display:flex; gap:4px; }
+  nav button { background:none; border:1px solid transparent; color:var(--dim); padding:5px 14px; border-radius:6px; font:inherit; cursor:pointer; }
+  nav button.on { color:var(--text); border-color:var(--line); background:var(--bg); }
+  select, button.ctl { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:4px 9px; font:inherit; }
+  button.ctl { cursor:pointer; } button.ctl:hover { border-color:var(--dim); }
+  input[type=range] { flex:1; min-width:240px; accent-color:var(--accent); }
+  fieldset { border:1px solid var(--line); border-radius:6px; margin:0; padding:2px 10px 4px; }
+  legend { color:var(--dim); font-size:11px; padding:0 4px; }
+  fieldset label { margin-right:10px; white-space:nowrap; }
+  main { padding:14px 16px; }
+  .tab { display:none; } .tab.on { display:block; }
+  .dim { color:var(--dim); } .alert { color:var(--alert); }
+  .chip { padding:2px 9px; border-radius:10px; border:1px solid var(--line); color:var(--dim); font-size:12px; white-space:nowrap; }
+  .chip.alert { color:var(--alert); border-color:var(--alert); }
+  .lab { display:grid; grid-template-columns:minmax(0, 3fr) minmax(360px, 2fr); gap:14px; align-items:start; }
+  @media (max-width:1000px) { .lab { grid-template-columns:1fr; } }
+  #canvas { width:100%; background:#000; border-radius:6px; display:block; }
+  .sec { border:1px solid var(--line); border-radius:6px; padding:8px 10px; margin-top:10px; }
+  .sec h3 { margin:0 0 6px; font-size:13px; } .sec h3 .dim { font-weight:400; }
+  .clist { display:flex; flex-wrap:wrap; gap:4px; }
+  .c { font-size:12px; padding:1px 8px; border-radius:10px; border:1px solid var(--line); white-space:nowrap; }
+  .c.closed { border-color:#5aa9ff; color:#5aa9ff; }
+  .c.green { border-color:var(--green); color:var(--green); } .c.amber { border-color:var(--amber); color:var(--amber); }
+  .c.red { border-color:var(--alert); color:var(--alert); }
+  .c.hi { background:rgba(232,234,237,.14); } .c .x { margin-left:5px; cursor:pointer; color:var(--dim); } .c .x:hover { color:var(--alert); }
+  .iplot { height:240px; }
+  .knn { border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+  .knn h3 { margin:0 0 4px; font-size:13px; }
+  .nb { border-top:1px solid var(--line); padding:8px 0; cursor:pointer; }
+  .nb:hover { background:rgba(232,234,237,.04); }
+  .nb .hd { display:flex; gap:10px; flex-wrap:wrap; align-items:baseline; margin-bottom:4px; }
+  .empty { padding:30px; text-align:center; color:var(--dim); border:1px dashed var(--line); border-radius:6px; }
+  table.xt { border-collapse:collapse; font-size:12px; font-variant-numeric:tabular-nums; margin-top:8px; }
+  table.xt th, table.xt td { padding:4px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  table.xt th:first-child, table.xt td:first-child { text-align:left; }
+  table.xt th { color:var(--dim); font-weight:500; }
+  .plot { height:340px; }
+  h2 { font-size:14px; margin:18px 0 4px; } h2:first-child { margin-top:0; }
+  .xgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:10px; margin-bottom:6px; }
+  .xgrid2 { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; margin-bottom:6px; }
+  .xgrid > div, .xgrid2 > div { min-height:340px; }
+  .xgrid2.tables > div { min-height:0; }
+  #x-table table.xt { font-size:14px; } #x-table table.xt th, #x-table table.xt td { padding:6px 14px; } #x-table h4 { font-size:14px; }
+  table.xt th[data-c] { cursor:pointer; }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <h1 id="title">runs_aesop</h1>
+    <label class="dim">pool <select id="pool"></select></label>
+    <label class="dim">run <select id="run"></select></label>
+    <nav><button data-tab="images">Images</button><button data-tab="scores">Scores</button><button data-tab="experiment">Experiment</button></nav>
+    <fieldset><legend>text models in plots</legend><span id="pmodels"></span></fieldset>
+    <span class="chip" id="info"></span>
+    <span class="dim" id="status"></span>
+  </div>
+  <div class="row" id="ibar">
+    <button class="ctl" id="prev">◀</button>
+    <input type="range" id="slider" min="0" max="0" value="0">
+    <button class="ctl" id="next">▶</button>
+    <button class="ctl" id="play">play</button>
+    <button class="ctl" id="onset">onset</button>
+    <button class="ctl" id="offset">offset</button>
+    <span class="chip" id="tick"></span>
+    <fieldset><legend>text model (kNN)</legend><span id="embs"></span></fieldset>
+    <label><input type="checkbox" id="show-gt" checked> GT boxes</label>
+    <label><input type="checkbox" id="show-owl" checked> OWL-ViT boxes</label>
+    <label><input type="checkbox" id="show-scn"> scenery</label>
+    <label><input type="checkbox" id="show-unl"> unlabeled</label>
+    <span class="dim">← → step (shift: 10)</span>
+  </div>
+</header>
+<main>
+  <section id="images" class="tab">
+    <div class="lab">
+      <div>
+        <canvas id="canvas"></canvas>
+        <div id="labels"></div>
+        <div class="sec" id="iplot-gt-s"><h3 id="iplot-gt-h"></h3><div id="iplot-gt" class="iplot"></div></div>
+        <div class="sec" id="iplot-owl-s"><h3 id="iplot-owl-h"></h3><div id="iplot-owl" class="iplot"></div></div>
+      </div>
+      <div class="knn" id="knn"></div>
+    </div>
+  </section>
+  <section id="scores" class="tab">
+    <div class="row">
+      <label class="dim">metric <select id="metric"></select></label>
+      <label class="dim">anomaly <select id="anom"></select></label>
+      <label class="dim">test-run labels <select id="tsrc"><option value="owl">raw OWL-ViT</option><option value="gt">ground truth</option></select></label>
+    </div>
+    <div id="splot-gt-s"><h2 id="splot-gt-h"></h2><div id="splot-gt" class="plot"></div></div>
+    <div id="splot-owl-s"><h2 id="splot-owl-h"></h2><div id="splot-owl" class="plot"></div></div>
+    <h2>Results <span class="dim" id="res-h"></span></h2><div id="res"></div>
+    <h2>Calibration <span class="dim">· each pool run's Q = 95th percentile of its leave-one-out scores (dots); tau = conformal rank of the Q's (dashed)</span></h2>
+    <div id="cplot" class="plot"></div>
+    <div id="frac"></div>
+  </section>
+  <section id="experiment" class="tab">
+    <div class="row">
+      <label class="dim">scoring function <select id="x-fn"><option>cosine_k1</option><option>cosine_k3</option><option selected>cosine_k5</option><option>cosine_k10</option><option>mahalanobis</option></select></label>
+      <span class="dim">cache = the pool's ground-truth prompts · test runs scored from raw OWL-ViT labels (dotted) and ground-truth labels (solid) · τ = conformal: Q<sub>r</sub> = each pool run's 95th percentile of its leave-one-out scores, τ = the ⌈(N+1)·0.95⌉-th smallest Q<sub>r</sub> (the largest when N &lt; 19) · lines follow "text models in plots"</span>
+    </div>
+    <div id="x-empty" class="empty" hidden>no experiment results yet: .venv/bin/python aesop_recreate/scripts/experiment.py --dataset <span id="x-ds"></span></div>
+    <div id="x-body">
+      <h2>Experiment setup</h2>
+      <div class="row" id="x-srcs"><label><input type="checkbox" data-s="gt" checked> ground truth</label><label><input type="checkbox" data-s="owl" checked> raw OWL-ViT</label></div>
+      <div class="xgrid"><div id="x-density"></div><div id="x-distinct"></div></div>
+      <h2>Embedding space: sparse or dense?</h2>
+      <div class="row">
+        <label class="dim">text model <select id="em-model"></select></label>
+        <label class="dim">map <select id="em-proj"><option value="tsne">t-SNE (cosine)</option><option value="pca">PCA (first 2 components)</option></select></label>
+        <span class="dim">points:</span><span id="em-show"><label><input type="checkbox" data-g="pool" checked> pool (GT)</label><label><input type="checkbox" data-g="gt" checked> test, GT labels</label><label><input type="checkbox" data-g="owl" checked> test, raw OWL-ViT labels</label></span>
+      </div>
+      <p class="dim" id="em-stats"></p>
+      <div class="xgrid2"><div id="em-map" style="min-height:520px"></div><div id="em-dist" style="min-height:520px"></div></div>
+      <p class="dim">map: one dot per corpus point (every 5th frame) · ● = ground-truth prompt, ✕ = raw OWL-ViT prompt · grey = nominal pool, green = test nominal, red = inside an anomaly window · t-SNE keeps neighbourhoods, not distances; read density from the histogram · hover for the concepts, click to open the frame</p>
+      <h2>Performance vs number of runs</h2>
+      <div class="row" id="x-q"><span class="dim">test-run labels:</span><label><input type="checkbox" data-s="gt" checked> ground truth</label><label><input type="checkbox" data-s="owl" checked> raw OWL-ViT</label>
+        <span class="dim">· band = worst to best of the draws</span></div>
+      <div class="xgrid"><div id="x-auroc"></div><div id="x-acc"></div></div>
+      <h2>Performance vs share of the nominal corpus</h2>
+      <div class="xgrid"><div id="x-cauroc"></div><div id="x-cacc"></div></div>
+      <h2>TPR, FPR and accuracy with the whole pool</h2>
+      <div class="row"><label class="dim">test runs <select id="x-anom"><option value="haybale">hay bale</option><option value="pedestrian">pedestrian</option><option value="emergency">emergency</option><option value="total" selected>total</option></select></label></div>
+      <p class="dim" id="x-table-note"></p>
+      <div class="xgrid2 tables" id="x-table"></div>
+      <h2>ROC curve (τ swept)</h2>
+      <p class="dim">τ = the conformal τ at each per-run quantile p of the pool's leave-one-out scores, from the highest p ≤ 75 at which every anomaly window is detected (TPR 1) to p = 100; where a window still beats τ(100), the curve continues through the window peaks up to the highest one (TPR 0). Same TP / FN / FP / TN as the table: a window is a TP if any of its points is above τ, a nominal point above τ is a FP. AUROC (in the legend) = the area under this curve · ◆ = the protocol's τ (p = 95)</p>
+      <div class="xgrid2"><div id="x-roc-gt"></div><div id="x-roc-owl"></div></div>
+      <h2>Score functions on performance</h2>
+      <div class="row" id="x-abl-src"><span class="dim">test-run labels:</span><label><input type="radio" name="x-abl-src" value="gt" checked> ground truth</label><label><input type="radio" name="x-abl-src" value="owl"> raw OWL-ViT</label></div>
+      <div class="xgrid2"><div id="x-sf-0"></div><div id="x-sf-1"></div><div id="x-sf-2"></div><div id="x-sf-3"></div></div>
+      <h2>Conformal threshold on performance</h2>
+      <div class="xgrid2"><div id="x-ct-0"></div><div id="x-ct-1"></div><div id="x-ct-2"></div><div id="x-ct-3"></div></div>
+      <h2>Overall performance vs thresholds</h2>
+      <div class="xgrid"><div id="x-th"></div></div>
+    </div>
+  </section>
+</main>
+<script>window.STATIC_SITE = true;</script>
+<script>
+const $ = id => document.getElementById(id);
+const S = {pool:"withheld", index:null, run:null, tick:0, tab:"images", emb:"e5_mistral", src:"owl", data:null, scores:null, timer:null, hi:null, img:new Image(), hide:new Set()};
+const SRC = {owl:"raw OWL-ViT", gt:"ground truth"};   // test runs are scored from both, against the ground-truth cache
+// a fresh layout per plot: Plotly writes axis ranges back into the layout it is given, so a shared one leaks between plots
+const layout = (extra = {}) => ({paper_bgcolor:"#101214", plot_bgcolor:"#101214", font:{color:"#e8eaed", size:11}, margin:{l:55, r:10, t:10, b:35},
+  xaxis:{gridcolor:"#2a2f36", zeroline:false}, yaxis:{gridcolor:"#2a2f36", type:"linear", rangemode:"tozero"}, legend:{orientation:"h", y:1.12}, ...extra});
+// the text models ticked under "text models in plots" (every score plot follows them)
+const shown = () => Object.entries(S.index.embedders).filter(([e]) => !S.hide.has(e));
+// one line per shown text model that has this source's column
+const lines = (col, src) => shown().filter(([e]) => S.scores[`${src}@${e}/${col}`])
+  .map(([e, [n, c]]) => ({x:S.scores.tick, y:S.scores[`${src}@${e}/${col}`], name:n, line:{color:c, width:1.5}, mode:"lines"}));
+// the score sources a page plots, one plot each: test runs are scored from raw OWL-ViT and from the GT, pool runs from the GT only
+const plotSrcs = () => isTest() ? ["owl", "gt"] : ["gt"];
+// served by serve.py, or exported as static files by export_static.py (window.STATIC_SITE: read-only, every stride-th frame)
+const STATIC = !!window.STATIC_SITE;
+const apiUrl = (path, pool) => STATIC ? `data/${pool}/${path.split("/").slice(2).join("/")}.json` : `${path}${path.includes("?") ? "&" : "?"}pool=${pool}`;
+const api = (path, pool = S.pool) => fetch(apiUrl(path, pool)).then(r => r.json());
+const pad = t => String(t).padStart(6, "0");
+const run = () => S.index.runs.find(r => r.name === S.run);
+const isTest = () => run()?.group === "test";
+const point = t => Math.floor(t / S.index.stride) * S.index.stride;
+const conceptOf = r => `${r.object} ${r.predicate}`;
+// a concept's colour against a reference label set: green = the same concept, amber = the same object with another
+// predicate, red = an object the reference doesn't have
+const objectOf = c => { const p = S.data.predicates.find(p => c.endsWith(` ${p}`)); return p ? c.slice(0, -p.length - 1) : c; };
+const matchCls = (c, ref) => ref.has(c) ? "green" : [...ref].some(r => objectOf(r) === objectOf(c)) ? "amber" : "red";
+const KEY = what => `<span style="color:var(--green)">green</span> = same concept${what}, <span style="color:var(--amber)">amber</span> = same object, other predicate, <span style="color:var(--alert)">red</span> = object not there`;
+const res = (e, m = "cosine_k5") => S.index.results?.embedders?.[e]?.[m];
+
+// ---------- run / tick / tab
+async function loadPool(pool, name, tick, tab) {
+  S.pool = pool; S.index = await api("/api/index", pool); S.exp = null; S.emap = null;
+  document.title = $("title").textContent = "runs_aesop";
+  $("pool").innerHTML = S.index.pools.map(p => `<option ${p === pool ? "selected" : ""}>${p}</option>`).join("");
+  const grp = g => S.index.runs.filter(r => r.group === g).map(r => `<option value="${r.name}">${r.name}${r.kind !== "nominal" ? ` (${r.kind})` : ""}</option>`).join("");
+  $("run").innerHTML = (grp("pool") ? `<optgroup label="nominal pool (${pool})">${grp("pool")}</optgroup>` : "") + `<optgroup label="test runs">${grp("test")}</optgroup>`;
+  $("embs").innerHTML = Object.entries(S.index.embedders).map(([e, [n, c]]) => `<label><input type="radio" name="emb" value="${e}" ${e === S.emb ? "checked" : ""}> <span style="color:${c}">${n}</span></label>`).join("");
+  for (const r of document.querySelectorAll("input[name=emb]")) r.onchange = () => { S.emb = r.value; drawKnn(); saveHash(); };
+  $("pmodels").innerHTML = Object.entries(S.index.embedders).map(([e, [n, c]]) => `<label><input type="checkbox" name="pm" value="${e}" ${S.hide.has(e) ? "" : "checked"}> <span style="color:${c}">${n}</span></label>`).join("");
+  for (const b of document.querySelectorAll("input[name=pm]")) b.onchange = () => { S.hide[b.checked ? "delete" : "add"](b.value); drawImagePlot(); drawScores(); drawExperiment(); };
+  const first = Object.values(S.index.results?.embedders || {})[0];   // any scored text model
+  const metrics = Object.keys(first || {cosine_k5:1});
+  $("metric").innerHTML = metrics.map(m => `<option ${m === "cosine_k5" ? "selected" : ""}>${m}</option>`).join("");
+  const kinds = Object.keys(first?.cosine_k5?.metrics?.owl || {total:1});
+  $("anom").innerHTML = kinds.map(k => `<option>${k}</option>`).join("");
+  await setRun(S.index.runs.some(r => r.name === name) ? name : S.index.runs[0]?.name, tick || 0);
+  setTab(tab || S.tab);
+}
+
+async function setRun(name, tick = 0) {
+  if (!name) return;
+  S.run = name; $("run").value = name; $("status").textContent = "loading…";
+  const [data, scores] = await Promise.all([api(`/api/labels/${name}`), api(`/api/scores/${name}`)]);
+  if (S.run !== name) return;
+  S.data = data; S.scores = scores; $("status").textContent = "";
+  const r = run();
+  $("info").textContent = `${r.group === "pool" ? "nominal pool run · ground truth · leave-one-out" : "test run · raw OWL-ViT and ground truth vs the GT cache"}${r.kind !== "nominal" ? ` · ${r.kind}` : ""}`;
+  $("slider").max = data.n - 1; $("slider").step = STATIC ? S.index.stride : 1;
+  for (const b of ["onset", "offset"]) $(b).disabled = !r.windows.length;
+  $("show-owl").checked = r.group === "test";   // nominal pages: raw boxes off by default (information only)
+  S.tick = Math.min(tick, data.n - 1);
+  drawImagePlot(); draw(); drawScores();
+}
+
+function setTick(t) {
+  if (STATIC) t = t < S.tick ? point(t) : Math.ceil(t / S.index.stride) * S.index.stride;   // only the scored frames are exported
+  S.tick = Math.max(0, Math.min(t, (S.data?.n || 1) - 1)); draw();
+}
+function setTab(tab) {
+  S.tab = tab;
+  for (const b of document.querySelectorAll("nav button")) b.classList.toggle("on", b.dataset.tab === tab);
+  for (const s of document.querySelectorAll(".tab")) s.classList.toggle("on", s.id === tab);
+  $("ibar").hidden = tab !== "images";
+  if (tab === "scores") drawScores(); else if (tab === "experiment") drawExperiment(); else { drawImagePlot(); draw(); }
+  saveHash();
+}
+function saveHash() { history.replaceState(null, "", `#${S.tab}/${S.pool}/${S.run}/${S.tick}/${S.emb}`); }
+
+// ---------- Images tab
+function gtEffective(t) {
+  // mirrors sim/concepts.py apply_overrides: track edits, then frame edits, then additions
+  const ov = S.data.overrides, track = ov.track || {}, frame = (ov.frame || {})[t] || {}, out = [];
+  for (const rec of S.data.gt[t] || []) {
+    const r = {...rec};
+    for (const e of [track[rec.id], frame[rec.id]]) if (e) Object.assign(r, e);
+    if (!r.drop) out.push(r);
+  }
+  for (const item of frame.add || []) { const [object, predicate] = item.split("|"); out.push({id:null, object, predicate, src:"added"}); }
+  return out;
+}
+const gtConcepts = t => [...new Set(gtEffective(t).filter(r => r.object).map(conceptOf))].sort();
+
+function draw() {
+  if (!S.data) return;
+  const t = S.tick, r = run(), pt = point(t), inWin = r.windows.some(([a, b]) => t >= a && t < b);
+  $("slider").value = t;
+  $("tick").innerHTML = `frame ${t} · point ${pt}${inWin ? ` · <span class="alert">ANOMALY</span>` : ""}`;
+  drawLabels(); drawKnn(); moveCursor();
+  const src = `${S.data.frames}/${pad(STATIC ? point(t) : t)}.jpg`;
+  if (!S.img.src.endsWith(src)) { S.img.onload = drawCanvas; S.img.src = src; } else drawCanvas();
+  saveHash();
+}
+
+function chips(items, cls, onX) {
+  return items.map(x => `<span class="c ${x.cls || cls}" data-c="${x.c}">${x.c}${x.extra || ""}${onX ? `<span class="x" title="remove">×</span>` : ""}</span>`).join("") || `<span class="dim">none</span>`;
+}
+function hoverable(el, onX) {
+  for (const ch of el.querySelectorAll(".c[data-c]")) {
+    ch.onmouseenter = () => { S.hi = ch.dataset.c; drawCanvas(); };
+    ch.onmouseleave = () => { S.hi = null; drawCanvas(); };
+    if (onX) ch.querySelector(".x").onclick = () => onX(ch.dataset.c);
+  }
+}
+
+function drawLabels() {
+  // both pages show both label sets: test runs are scored from either (raw first), nominal runs from the ground truth
+  // (raw shown for information)
+  const t = S.tick, el = $("labels"), test = isTest();
+  const owl = S.data.owl[t] || [], cs = [...new Set(owl.map(x => x.concept))];
+  const best = c => Math.max(...owl.filter(x => x.concept === c).map(x => x.score)), n = c => owl.filter(x => x.concept === c).length;
+  const gt = gtConcepts(t), gtSet = new Set(gt), nInst = c => gtEffective(t).filter(r => r.object && conceptOf(r) === c && r.box).length;
+  const stored = S.data.corpus[point(t)]?.gt, stale = stored && t % S.index.stride === 0 && (stored.length !== gt.length || stored.some(c => !gt.includes(c)));
+  const opts = S.data.objects.flatMap(o => S.data.predicates.map(p => `<option>${o} ${p}</option>`)).join("");
+  const raw = `<div class="sec"><h3>Raw OWL-ViT labels <span class="dim">· read-only · ${test ? "" : "for information, not scored · "}vs the GT: ${KEY("")}</span></h3>
+    <div class="clist" id="owlc">${chips(cs.map(c => ({c, extra:` ${best(c).toFixed(2)}${n(c) > 1 ? ` ×${n(c)}` : ""}`, cls:matchCls(c, gtSet)})))}</div>
+    ${Object.keys(S.data.owl).length ? "" : `<p class="dim">no OWL-ViT concepts yet (run_concepts.py owl)</p>`}</div>`;
+  const truth = `<div class="sec"><h3>Ground truth <span class="dim">· editable${test ? "" : " · this frame's prompt"}</span></h3>
+    <div class="clist" id="gtc">${chips(gt.map(c => ({c, extra:nInst(c) > 1 ? ` ×${nInst(c)}` : ""})), "closed", true)}</div>
+    <div class="row" style="margin-top:6px"><select id="add">${opts}</select><button class="ctl" id="add-btn">add</button>
+    ${stale ? `<span class="alert">⚠ edited after embedding: re-run build_corpus.py + score.py</span>` : ""}</div></div>`;
+  el.innerHTML = test ? raw + truth : truth + raw;
+  hoverable($("owlc"));
+  hoverable($("gtc"), c => gtEdit(t, c, "remove"));
+  $("add-btn").onclick = () => gtEdit(t, $("add").value, "add");
+}
+
+function drawCanvas() {
+  const cv = $("canvas"), img = S.img, t = S.tick;
+  if (!img.naturalWidth) return;
+  cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+  const g = cv.getContext("2d");
+  g.drawImage(img, 0, 0);
+  g.font = "12px system-ui";
+  const box = (b, colour, label, dashed, strong) => {
+    g.setLineDash(dashed ? [5, 4] : []); g.strokeStyle = colour; g.lineWidth = strong ? 4 : 2;
+    g.strokeRect(b[0], b[1], b[2] - b[0], b[3] - b[1]);
+    g.setLineDash([]); const w = g.measureText(label).width + 6;
+    g.fillStyle = strong ? colour : "rgba(16,18,20,.75)"; g.fillRect(b[0], b[1] - 15, w, 15);
+    g.fillStyle = strong ? "#101214" : colour; g.fillText(label, b[0] + 3, b[1] - 3);
+  };
+  const focus = S.hi, dim = c => focus && c !== focus;
+  if ($("show-owl").checked)
+    for (const x of S.data.owl[t] || []) if (!dim(x.concept) || focus === x.concept) box(x.box, "#5aa9ff", `${x.concept} ${x.score.toFixed(2)}`, true, focus === x.concept);
+  if ($("show-gt").checked) for (const r of gtEffective(t)) {
+    const c = r.object ? conceptOf(r) : null, strong = focus && c === focus;
+    const hidden = (!r.object && !$("show-unl").checked) || (S.data.scenery.includes(r.object) && !$("show-scn").checked);
+    if (!r.box || ((hidden || dim(c)) && !strong)) continue;
+    box(r.box, r.object ? "#5aa9ff" : "#9aa0a6", c || `? ${r.src}`, false, strong);
+  }
+}
+
+async function gtEdit(t, c, op) {
+  // remove: drop every instance of c in frame t (and any addition of c); add: restore dropped instances of c, else add c without a box
+  const f = ((S.data.overrides.frame ||= {})[t] ||= {}), pred = S.data.predicates.find(p => c.endsWith(` ${p}`));
+  const key = `${c.slice(0, -pred.length - 1)}|${pred}`;
+  const label = rec => { const r = {...rec, ...((S.data.overrides.track || {})[rec.id] || {})}; return r.object ? conceptOf(r) : null; };
+  const recs = (S.data.gt[t] || []).filter(rec => label(rec) === c);
+  f.add = (f.add || []).filter(x => x.replace("|", " ") !== c);
+  if (op === "remove") for (const rec of recs) f[rec.id] = {...(f[rec.id] || {}), drop:true};
+  else {
+    const dropped = recs.filter(rec => f[rec.id]?.drop);
+    for (const rec of dropped) delete f[rec.id];
+    if (!dropped.length && !gtConcepts(t).includes(c)) f.add.push(key);
+  }
+  if (!f.add.length) delete f.add;
+  if (!Object.keys(f).length) delete S.data.overrides.frame[t];
+  draw();
+  if (STATIC) { $("status").textContent = "static copy: edits are not saved"; return; }
+  $("status").textContent = "saving…";
+  const r = await fetch(`/api/labels/${S.run}`, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(S.data.overrides)}).then(r => r.json());
+  $("status").textContent = r.ok ? `saved · ${Object.keys(S.data.overrides.frame || {}).length} frames edited in ${S.run}` : "save failed";
+}
+
+function scoreAt(src, e, t, m = "cosine_k5") {
+  const i = (S.scores.tick || []).indexOf(point(t));
+  return i < 0 ? null : S.scores[`${src}@${e}/${m}`]?.[i];
+}
+
+function drawImagePlot() {
+  if (!S.data || S.tab !== "images") return;
+  const test = isTest();
+  $("iplot-owl-s").hidden = !test;
+  for (const src of plotSrcs()) {
+    const id = `iplot-${src}`;
+    $(`${id}-h`).innerHTML = `${test ? `${SRC[src]} labels · score vs the GT nominal cache` : "Ground truth · leave-one-out score vs the other pool runs"} <span class="dim">· cosine k5${test ? " · dashed = conformal tau" : " · no threshold"} · click to seek</span>`;
+    if (!S.scores.tick) { message(id, "not scored yet (build_corpus.py, score.py)"); continue; }
+    scorePlot(id, src, "cosine_k5", test, true);
+    $(id).on("plotly_click", ev => setTick(ev.points[0].x));
+  }
+}
+// one source's scores for every text model: anomaly windows shaded, each model's tau dashed (test runs), the frame cursor
+function scorePlot(id, src, m, withTau, withCursor) {
+  clearMessage(id);
+  const shapes = run().windows.map(([a, b]) => ({type:"rect", xref:"x", yref:"paper", x0:a, x1:b, y0:0, y1:1, fillcolor:"rgba(255,92,92,.12)", line:{width:0}}));
+  if (withTau) for (const [e, [, c]] of shown()) if (res(e, m)?.tau != null)
+    shapes.push({type:"line", xref:"paper", x0:0, x1:1, y0:res(e, m).tau, y1:res(e, m).tau, line:{color:c, dash:"dash", width:1}});
+  if (withCursor) shapes.push(cursor());
+  // legend clicks off: the "text models in plots" boxes show / hide models in every plot at once
+  Plotly.react(id, lines(m, src), layout({shapes, legend:{orientation:"h", y:1.12, itemclick:false, itemdoubleclick:false}}), {displayModeBar:false, responsive:true}); Plotly.Plots.resize(id);
+}
+// a plot div shows either a Plotly figure or a message: purge the figure before writing the message, and the message
+// before drawing (wiping a figure's DOM by hand leaves Plotly updating a plot that is no longer there)
+function message(id, text) { Plotly.purge(id); $(id).innerHTML = `<div class="empty">${text}</div>`; }
+function clearMessage(id) { if ($(id).querySelector(".empty")) $(id).innerHTML = ""; }
+const cursor = () => ({type:"line", xref:"x", yref:"paper", x0:S.tick, x1:S.tick, y0:0, y1:1, line:{color:"#e8eaed", width:1}, name:"cursor"});
+function moveCursor() {
+  for (const src of plotSrcs()) {
+    const el = $(`iplot-${src}`); if (!el.layout) continue;
+    Plotly.relayout(el, {shapes:[...el.layout.shapes.filter(s => s.name !== "cursor"), cursor()]});
+  }
+}
+
+function drawKnn() {
+  const el = $("knn"), e = S.emb, [ename] = S.index.embedders[e], pt = point(S.tick), test = isTest();
+  const src = test ? S.src : "gt", nbs = S.data.knn?.[src]?.[e]?.[pt], c = S.data.corpus[pt];
+  const toggle = test ? `<div class="row" style="margin:2px 0 6px">query labels: ${Object.entries(SRC).map(([k, n]) =>
+    `<label><input type="radio" name="ksrc" value="${k}" ${k === src ? "checked" : ""}> ${n}</label>`).join(" ")}</div>` : "";
+  const head = `<h3>kNN top 5 · ${ename} · ${test ? "GT nominal cache" : "other pool runs (leave-one-out)"}</h3>${toggle}`;
+  if (!nbs || !c) { el.innerHTML = head + `<div class="empty">not embedded / scored yet</div>`; wireKsrc(); return; }
+  const mine = new Set(src === "owl" ? c.raw : c.gt), s = scoreAt(src, e, pt), tau = res(e)?.tau;
+  const flag = test && tau != null && s != null ? (s > tau ? ` · <span class="alert">FLAGGED</span>` : " · below tau") : "";
+  el.innerHTML = head + `<div>this frame (${SRC[src]}): ${test ? "score" : "LOO score"} <b>${s == null ? "–" : s.toFixed(4)}</b>${test && tau != null ? ` · tau ${tau.toFixed(4)}` : ""}${flag}</div>
+    <div class="dim">${c.same_prompt?.[src] ?? 0} pool points have exactly this prompt · chips vs this frame's ${SRC[src]} labels: ${KEY(" in this frame")}</div>` +
+    nbs.map(([r, t, cos], i) => {
+      const labs = S.data.nbr_labels[`${r}|${t}`] || [], shared = labs.filter(x => mine.has(x)).length, ns = S.data.nbr_scores[e]?.[`${r}|${t}`];
+      return `<div class="nb" data-r="${r}" data-t="${t}"><div class="hd"><b>${i + 1}</b> <span>${r} · t ${t}</span>
+        <span class="dim">cos ${cos.toFixed(3)}${cos >= 0.99995 ? " · identical prompt" : ""} · its LOO score ${ns == null ? "–" : ns.toFixed(4)} · ${shared}/${mine.size} shared</span></div>
+        <div class="clist">${chips(labs.map(x => ({c:x, cls:matchCls(x, mine)})))}</div></div>`;
+    }).join("");
+  for (const nb of el.querySelectorAll(".nb")) nb.onclick = () => openFrame(nb.dataset.r, +nb.dataset.t);
+  wireKsrc();
+}
+function wireKsrc() { for (const r of document.querySelectorAll("input[name=ksrc]")) r.onchange = () => { S.src = r.value; drawKnn(); }; }
+async function openFrame(name, t) { if (name !== S.run) await setRun(name, t); else setTick(t); setTab("images"); }
+
+// ---------- Scores tab
+function drawScores() {
+  if (S.tab !== "scores" || !S.data) return;
+  const m = $("metric").value, test = isTest(), r = run();
+  $("splot-owl-s").hidden = !test;
+  for (const src of plotSrcs()) {
+    const id = `splot-${src}`;
+    $(`${id}-h`).innerHTML = `${S.run} · ${SRC[src]} labels · ${m} <span class="dim">· ${test ? "vs the GT nominal cache · dashed = conformal tau" : "leave-one-out"} · click → Images</span>`;
+    if (!S.scores.tick) { message(id, "not scored yet"); continue; }
+    scorePlot(id, src, m, test, false);
+    $(id).on("plotly_click", ev => openFrame(S.run, ev.points[0].x));
+  }
+  const R = S.index.results;
+  if (!R) { $("res").innerHTML = `<div class="empty">no results yet (score.py)</div>`; Plotly.purge("cplot"); $("frac").innerHTML = ""; return; }
+  const a = $("anom").value, ts = $("tsrc").value, f = x => x == null ? "–" : x.toFixed(3);
+  $("res-h").textContent = `· ${S.pool} pool (${R.reference_runs.length} runs) · ${a} · test runs scored from ${SRC[ts]} labels · Elhafsi: a window is detected if any point is above tau; accuracy = (TPR + TNR) / 2`;
+  $("res").innerHTML = `<table class="xt"><tr><th>text model</th><th>tau conformal</th><th>TPR</th><th>FPR</th><th>accuracy</th><th>AUROC</th>
+    <th>tau AESOP (pooled 95th)</th><th>TPR</th><th>FPR</th><th>accuracy</th><th>windows</th><th>nominal points</th></tr>` +
+    Object.entries(S.index.embedders).map(([e, [n]]) => {
+      const x = res(e, m); if (!x) return "";
+      const c = x.metrics[ts]?.[a]?.conformal || {}, s = x.metrics[ts]?.[a]?.aesop || {};
+      return `<tr><td>${n}</td><td>${f(x.tau)}</td><td>${f(c.TPR)}</td><td>${f(c.FPR)}</td><td>${f(c.accuracy)}</td><td>${f(c.AUROC)}</td>
+        <td>${f(x.tau_aesop)}</td><td>${f(s.TPR)}</td><td>${f(s.FPR)}</td><td>${f(s.accuracy)}</td><td>${c.n_anomalous ?? "–"}</td><td>${c.n_nominal ?? "–"}</td></tr>`;
+    }).join("") + `</table>`;
+  const traces = [], shapes = [];
+  for (const [e, [n, c]] of shown()) {
+    const x = res(e, m); if (!x) continue;
+    traces.push({x:Object.keys(x.Q), y:Object.values(x.Q), name:n, mode:"markers", marker:{color:c, size:8}});
+    if (x.tau != null) shapes.push({type:"line", xref:"paper", x0:0, x1:1, y0:x.tau, y1:x.tau, line:{color:c, dash:"dash", width:1}});
+  }
+  Plotly.react("cplot", traces, layout({shapes, legend:{orientation:"h", y:1.12, itemclick:false, itemdoubleclick:false}, margin:{l:55, r:10, t:10, b:90}, xaxis:{gridcolor:"#2a2f36", type:"category", tickangle:-45}}), {displayModeBar:false, responsive:true}); Plotly.Plots.resize("cplot");
+  // pool runs: their leave-one-out ground-truth scores; test runs: from the chosen labels
+  const frac = (e, rn) => R.test_runs.includes(rn) ? res(e, m)?.frac_above?.[ts]?.[rn] : res(e, m)?.frac_above?.gt?.[rn];
+  $("frac").innerHTML = `<table class="xt"><tr><th>fraction of points above the conformal tau</th>${Object.values(S.index.embedders).map(([n]) => `<th>${n}</th>`).join("")}</tr>` +
+    [...R.reference_runs, ...R.test_runs].map(rn => `<tr><td>${rn}${R.test_runs.includes(rn) ? ` (test, ${SRC[ts]})` : ""}</td>${Object.keys(S.index.embedders).map(e => `<td>${f(frac(e, rn))}</td>`).join("")}</tr>`).join("") + `</table>`;
+}
+
+// ---------- Experiment tab (aesop_recreate/scripts/experiment.py; the layout of analysis/dashboard.html's Experiment tab)
+const X_SRC = {gt:"ground truth", owl:"raw OWL-ViT"};
+const X_FNS = ["cosine_k1", "cosine_k3", "cosine_k5", "cosine_k10", "mahalanobis"];
+const X_FN_C = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181"];
+// AESOP's CARLA results (Sinha et al. 2024, Tables IV and IX), as in the first dashboard: shown in brackets next to MPNet and
+// e5-Mistral in the ground-truth table; its main setting's cache includes the test routes (~ our included pool)
+const AESOP = {included:{mpnet:{TPR:0.69, FPR:0.05, accuracy:0.82}, e5_mistral:{TPR:0.95, FPR:0.05, accuracy:0.95}},
+               withheld:{mpnet:{TPR:0.55, FPR:0.11, accuracy:0.72}, e5_mistral:{TPR:0.96, FPR:0.19, accuracy:0.89}}};
+const X_LAYOUT = (title, xt, yt, extra = {}) => ({title:{text:title, font:{size:13}}, height:340, margin:{l:52, r:12, t:36, b:40},
+  paper_bgcolor:"#101214", plot_bgcolor:"#181b1f", font:{color:"#e8eaed", size:11}, hovermode:"closest",
+  xaxis:{title:xt, gridcolor:"#2a2f36", zeroline:false}, yaxis:{title:yt, gridcolor:"#2a2f36", zeroline:false},
+  legend:{orientation:"h", y:-0.3, yanchor:"top", font:{size:10}}, ...extra});
+const X_CFG = {displayModeBar:false, responsive:true};
+const xMean = a => a.reduce((x, y) => x + y, 0) / a.length;
+const xFade = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, ${a})`;
+function xBy(rows, key, val) {   // [{x, mean, lo, hi, cov}] over the draws of each pool size / corpus share
+  const by = {};
+  for (const r of rows || []) (by[r[key]] ||= []).push(r);
+  return Object.entries(by).map(([x, rs]) => { const v = rs.map(val);
+    return {x:key === "share" ? Math.round(100 * x) : +x, mean:xMean(v), lo:Math.min(...v), hi:Math.max(...v), cov:xMean(rs.map(r => r.coverage ?? 0)), capped:rs.some(r => r.capped)}; })
+    .sort((a, b) => a.x - b.x);
+}
+// a series' line (dotted for raw OWL-ViT queries), plus a band from its worst to its best draw
+function xLine(pts, name, colour, dash = "solid", unit = "") {
+  const x = pts.map(p => p.x), line = {x, y:pts.map(p => p.mean), name, legendgroup:name, type:"scatter", mode:"lines+markers",
+    line:{color:colour, width:2, dash}, marker:{size:7, color:colour, line:{width:1.5, color:"#181b1f"}},
+    customdata:pts.map(p => `${p.lo.toFixed(3)}–${p.hi.toFixed(3)}${p.cov ? `, ${Math.round(100 * p.cov)}% of the pool's concepts in the cache` : ""}${p.capped ? ", τ = the largest Q (N < 19)" : ""}`),
+    hovertemplate:`${name}<br>%{x}${unit}: %{y:.3f}<br>draws: %{customdata}<extra></extra>`};
+  if (pts.every(p => p.lo === p.hi)) return [line];
+  return [{x:[...x, ...x.slice().reverse()], y:[...pts.map(p => p.hi), ...pts.map(p => p.lo).reverse()], fill:"toself", fillcolor:xFade(colour, 0.13),
+    line:{width:0}, hoverinfo:"skip", showlegend:false, legendgroup:name, type:"scatter", mode:"lines"}, line];
+}
+const xChecked = id => new Set([...document.querySelectorAll(`#${id} input:checked`)].map(cb => cb.dataset.s));
+
+// ---------- Experiment tab: embedding space (aesop_recreate/scripts/embed_map.py)
+async function drawEmbMap() {
+  if (S.tab !== "experiment" || !S.index) return;
+  if (!S.emap) S.emap = await api("/api/embmap");
+  const M = S.emap, sel = $("em-model");
+  if (!M.embedders) { message("em-map", "not computed yet: .venv/bin/python aesop_recreate/scripts/embed_map.py --dataset " + S.index.dataset); Plotly.purge("em-dist"); $("em-stats").textContent = ""; return; }
+  if (!sel.options.length || ![...sel.options].some(o => M.embedders[o.value]))
+    sel.innerHTML = Object.entries(S.index.embedders).filter(([e]) => M.embedders[e]).map(([e, [n]]) => `<option value="${e}" ${e === S.emb ? "selected" : ""}>${n}</option>`).join("");
+  const e = sel.value, E = M.embedders[e], [ename, ecol] = S.index.embedders[e], st = E.stats, tau = E.tau;
+  $("em-stats").innerHTML = `${ename}: ${st.dim}-d vectors, effective dimensionality <b>${st.effective_dim.toFixed(1)}</b> · first 2 components hold ${(100 * st.pc12_share).toFixed(0)}% of the variance · ` +
+    `mean cosine of random pool pairs <b>${st.mean_random_cos.toFixed(4)}</b> · median distance (1 − cos): random pool pair <b>${st.median_random_dist.toFixed(4)}</b>, pool point to its 5 nearest other-run points <b>${st.median_pool_k5.toFixed(4)}</b> · τ <b>${tau == null ? "–" : tau.toFixed(4)}</b>`;
+  clearMessage("em-map");
+  const xy = E[$("em-proj").value], on = new Set([...document.querySelectorAll("#em-show input:checked")].map(c => c.dataset.g));
+  const kinds = [["pool", "gt", "pool", "#9aa0a6", "circle", 4, "pool (GT)"], ["gt", "gt", "test nominal", "#5fd38d", "circle", 6, "test nominal · GT"],
+    ["gt", "gt", "anomaly window", "#ff5c5c", "circle", 7, "anomaly window · GT"], ["owl", "owl", "test nominal", "#5aa9ff", "x", 6, "test nominal · raw"],
+    ["owl", "owl", "anomaly window", "#ffb84d", "x", 7, "anomaly window · raw"]];
+  const traces = kinds.filter(([g]) => on.has(g)).map(([g, src, group, c, sym, size, name]) => {
+    const idx = M.points.map((q, i) => i).filter(i => M.points[i].src === src && M.points[i].group === group);
+    return {x:idx.map(i => xy[i][0]), y:idx.map(i => xy[i][1]), type:"scattergl", mode:"markers", name, marker:{color:c, symbol:sym, size, opacity:g === "pool" ? 0.45 : 0.9},
+      customdata:idx.map(i => [M.points[i].run, M.points[i].t, E.k5[i].toFixed(4), M.points[i].concepts.join("<br>")]),
+      hovertemplate:"%{customdata[0]} · t %{customdata[1]} · k5 score %{customdata[2]}<br>%{customdata[3]}<extra>" + name + "</extra>"};
+  });
+  Plotly.react("em-map", traces, X_LAYOUT(`${ename} · ${$("em-proj").value === "tsne" ? "t-SNE" : "PCA"}`, "", "", {height:520, xaxis:{showticklabels:false, gridcolor:"#2a2f36", zeroline:false},
+    yaxis:{showticklabels:false, gridcolor:"#2a2f36", zeroline:false}, legend:{orientation:"h", y:-0.05, yanchor:"top", font:{size:10}}}), X_CFG);
+  $("em-map").removeAllListeners?.("plotly_click");
+  $("em-map").on("plotly_click", ev => { const [run, t] = ev.points[0].customdata; openFrame(run, +t); });
+  // distances: how far apart points are overall vs to their nearest neighbours, against tau
+  const sel_ = (src, group) => M.points.map((q, i) => i).filter(i => M.points[i].src === src && M.points[i].group === group).map(i => E.k5[i]);
+  const hist = (v, name, c) => ({x:v, type:"histogram", histnorm:"probability density", name, opacity:0.55, marker:{color:c}, nbinsx:60});
+  const dist = [hist(E.random_pairs, "random pool pair", "#5f6368"), hist(sel_("gt", "pool"), "pool point → 5 nearest (leave-one-out)", "#9aa0a6"),
+    hist(sel_("gt", "test nominal"), "test nominal · GT → 5 nearest", "#5fd38d"), hist(sel_("gt", "anomaly window"), "anomaly window · GT → 5 nearest", "#ff5c5c"),
+    hist(sel_("owl", "test nominal"), "test nominal · raw → 5 nearest", "#5aa9ff"), hist(sel_("owl", "anomaly window"), "anomaly window · raw → 5 nearest", "#ffb84d")];
+  Plotly.react("em-dist", dist, X_LAYOUT(`${ename} · cosine distance (1 − cos)`, "distance", "density", {height:520, barmode:"overlay",
+    shapes:tau == null ? [] : [{type:"line", xref:"x", yref:"paper", x0:tau, x1:tau, y0:0, y1:1, line:{color:ecol, dash:"dash", width:2}}],
+    annotations:tau == null ? [] : [{x:tau, y:1, xref:"x", yref:"paper", text:"τ", showarrow:false, font:{color:ecol}, yanchor:"bottom"}],
+    legend:{orientation:"h", y:-0.15, yanchor:"top", font:{size:10}}}), X_CFG);
+}
+
+async function drawExperiment() {
+  if (S.tab !== "experiment" || !S.index) return;
+  if (!S.exp) S.exp = await api("/api/experiment");
+  drawEmbMap();
+  const R = S.exp, fn = $("x-fn").value, none = !R.full;
+  $("x-empty").hidden = !none; $("x-body").hidden = none; $("x-ds").textContent = S.index.dataset;
+  if (none) return;
+  const models = shown();
+  // setup: one point per pool run, in config order
+  const per = R.setup.per_run, srcs = [...xChecked("x-srcs")], dash = s => s === "owl" ? "dot" : "solid", sc = {gt:"#5fd38d", owl:"#5aa9ff"};
+  const runLine = (s, val) => ({x:per[s].map(r => r.i), y:per[s].map(val), text:per[s].map(r => r.run), name:X_SRC[s], type:"scatter", mode:"lines+markers",
+    line:{color:sc[s], width:2, dash:dash(s)}, marker:{size:7, color:sc[s]}, hovertemplate:`${X_SRC[s]}<br>run %{x}: %{text}<br>%{y}<extra></extra>`});
+  Plotly.react("x-density", srcs.map(s => runLine(s, r => +r.per_frame.toFixed(2))),
+    X_LAYOUT("Concept density: each pool run's concepts per point", "run added (pool order)", "concepts / point", {xaxis:{title:"run added (pool order)", gridcolor:"#2a2f36", dtick:1}}), X_CFG);
+  Plotly.react("x-distinct", srcs.map(s => runLine(s, r => r.cumulative_distinct)),
+    X_LAYOUT("Distinct concepts in the pool (cumulative)", "runs in the cache", "distinct concepts", {xaxis:{title:"runs in the cache", gridcolor:"#2a2f36", dtick:1},
+      yaxis:{title:"distinct concepts", rangemode:"tozero", gridcolor:"#2a2f36"}}), X_CFG);
+  // performance vs pool size and vs corpus share: one line per shown text model and test-label source
+  const q = [...xChecked("x-q")], lines = [];
+  for (const s of q) for (const [e, [n, c]] of models) lines.push([`${s}@${e}/${fn}`, `${n} · ${s === "gt" ? "GT" : "raw"}`, c, dash(s)]);
+  for (const [metric, id, cid] of [["AUROC", "x-auroc", "x-cauroc"], ["accuracy", "x-acc", "x-cacc"]]) {
+    const yr = {yaxis:{title:metric, gridcolor:"#2a2f36", zeroline:false, range:metric === "AUROC" ? [0.3, 1.02] : [0.3, 1.02]}};
+    Plotly.react(id, lines.filter(([k]) => R.pool_sweep[k]).flatMap(([k, n, c, d]) => xLine(xBy(R.pool_sweep[k], "n_runs", r => r[metric]), n, c, d, " runs")),
+      X_LAYOUT(`${metric} vs runs in the pool · ${fn}`, "runs in the pool", metric, {...yr, xaxis:{title:"runs in the pool", gridcolor:"#2a2f36", dtick:5}}), X_CFG);
+    const cs = R.corpus_sweep || {};
+    Plotly.react(cid, lines.filter(([k]) => cs[k]).flatMap(([k, n, c, d]) => xLine(xBy(cs[k], "share", r => r[metric]), n, c, d, "% of the corpus")),
+      X_LAYOUT(cs[lines[0]?.[0]] ? `${metric} vs share of the nominal corpus · ${fn}` : `${metric} vs share of the corpus · not computed for ${fn}`,
+        "% of the pool's points in the cache", metric, {...yr, xaxis:{title:"% of the pool's points in the cache", gridcolor:"#2a2f36", dtick:10}}), X_CFG);
+  }
+  xTable(R, fn);
+  // ROC: one curve per shown text model, per test-label source; ◆ = the operating point at p = 95
+  for (const s of ["gt", "owl"]) {
+    const traces = [{x:[0, 1], y:[0, 1], mode:"lines", line:{color:"#5f6368", dash:"dot", width:1}, hoverinfo:"skip", showlegend:false}];
+    for (const [e, [n, c]] of models) {
+      const r = R.roc?.[`${s}@${e}/${fn}`]; if (!r) continue;
+      const pts = r.points, op = pts.find(q => q.p === R.protocol.pct);
+      const lab = q => q.p == null ? "a window peak (beyond the quantiles)" : `p = ${q.p}`;
+      traces.push({x:[0, ...pts.map(q => q.FPR), 1], y:[0, ...pts.map(q => q.TPR), 1], name:`${n} · AUROC ${r.AUROC.toFixed(3)}`, mode:"lines", line:{color:c, width:2, shape:"linear"},
+        customdata:[["", "", ""], ...pts.map(q => [lab(q), q.tau.toPrecision(4), q.accuracy.toFixed(3)]), ["", "", ""]],
+        hovertemplate:`${n}<br>τ %{customdata[1]} (%{customdata[0]})<br>TPR %{y:.3f} · FPR %{x:.3f} · accuracy %{customdata[2]}<extra></extra>`});
+      if (op) traces.push({x:[op.FPR], y:[op.TPR], mode:"markers", marker:{symbol:"diamond", size:11, color:c, line:{width:1.5, color:"#e8eaed"}}, showlegend:false,
+        hovertemplate:`${n} at p = 95 (the protocol's τ ${op.tau.toPrecision(4)})<br>TPR %{y:.3f} · FPR %{x:.3f}<extra></extra>`});
+    }
+    Plotly.react(`x-roc-${s}`, traces, X_LAYOUT(`ROC · test runs scored from ${X_SRC[s]} labels · ${fn}`, "FPR (nominal points above τ)", "TPR (windows detected)",
+      {xaxis:{title:"FPR (nominal points above τ)", gridcolor:"#2a2f36", zeroline:false, range:[-0.01, 1.01]},
+       yaxis:{title:"TPR (windows detected)", gridcolor:"#2a2f36", zeroline:false, range:[-0.02, 1.02]}}), X_CFG);
+  }
+  // ablations per text model: scoring functions vs pool size, and the threshold sweep (the scoring function above)
+  const ab = document.querySelector("input[name=x-abl-src]:checked").value, Y01 = t => ({yaxis:{title:t, gridcolor:"#2a2f36", zeroline:false, range:[0, 1.02]}});
+  const pct = [{type:"line", x0:R.protocol.pct, x1:R.protocol.pct, y0:0, y1:1, yref:"paper", line:{color:"#9aa0a6", dash:"dot", width:1}}];
+  Object.entries(S.index.embedders).forEach(([e, [n]], i) => {
+    const enc = `${ab}@${e}`, th = R.threshold_sweep[`${enc}/${fn}`] || [];
+    Plotly.react(`x-sf-${i}`, X_FNS.filter(f => R.pool_sweep[`${enc}/${f}`]).flatMap((f, j) => xLine(xBy(R.pool_sweep[`${enc}/${f}`], "n_runs", r => r.accuracy), f, X_FN_C[j], "solid", " runs")),
+      X_LAYOUT(`${n} · ${X_SRC[ab]} labels · accuracy by scoring function`, "runs in the pool", "accuracy", {...Y01("accuracy"), xaxis:{title:"runs in the pool", gridcolor:"#2a2f36", dtick:5}}), X_CFG);
+    Plotly.react(`x-ct-${i}`, [["TPR", "#5fd38d"], ["FPR", "#ff5c5c"], ["accuracy", "#e8eaed"]].map(([m, c]) => ({x:th.map(r => r.pct), y:th.map(r => r[m]), name:m, type:"scatter", mode:"lines",
+        line:{color:c, width:2}, marker:{size:6, color:c}, hovertemplate:`${m}<br>Q at the %{x}th pct: %{y:.3f}<extra></extra>`})),
+      X_LAYOUT(`${n} · ${X_SRC[ab]} labels · ${fn}`, "Q_r percentile of each run's leave-one-out scores", "rate", {...Y01("rate"), shapes:pct}), X_CFG);
+  });
+  Plotly.react("x-th", lines.filter(([k]) => R.threshold_sweep[k]).map(([k, n, c, d]) => ({x:R.threshold_sweep[k].map(r => r.pct), y:R.threshold_sweep[k].map(r => r.accuracy),
+      name:n, type:"scatter", mode:"lines", line:{color:c, width:2, dash:d}, hovertemplate:`${n}<br>Q at the %{x}th pct: accuracy %{y:.3f}<extra></extra>`})),
+    X_LAYOUT(`Accuracy vs threshold · ${fn}`, "Q_r percentile", "accuracy", {...Y01("accuracy"), shapes:pct}), X_CFG);
+}
+
+function xTable(R, fn, sort = {}) {
+  // one table per test-label source, one row per text model, for the chosen scoring function; click a header to sort
+  const cols = ["TPR", "FPR", "accuracy", "AUROC", "tau"], head = {tau:"τ"}, anom = $("x-anom").value;
+  $("x-table-note").textContent = "scored as Elhafsi et al. / AESOP: TPR = detected anomaly windows / windows (a window is detected if any of its points is above τ) · " +
+    "FPR = flagged other points / other points · accuracy = (TPR + TNR) / 2 · AUROC = windows (their highest score) vs other points · " +
+    `test runs: ${anom === "total" ? "all 4" : `t2_test_nominal + the ${anom} run`} · AESOP's own CARLA results in brackets (ground truth, all test runs)`;
+  const met = k => anom === "total" ? R.full[k] : R.full[k] && R.per_anomaly?.[k]?.[anom] && {...R.per_anomaly[k][anom], tau:R.full[k].tau};
+  let foot = "";
+  $("x-table").innerHTML = ["gt", "owl"].map(src => {
+    const rows = Object.entries(S.index.embedders).map(([e, [n]]) => ({name:n, emb:e, ...met(`${src}@${e}/${fn}`)})).filter(r => r.tau !== undefined);
+    const ref = r => src === "gt" && anom === "total" ? (AESOP[R.pool] || {})[r.emb] : null;
+    if (rows[0]) foot = `${rows[0].n_anomalous} anomaly windows, ${rows[0].n_nominal} other points · ${R.reference_runs.length} pool runs · scoring function ${fn}`;
+    if (sort[src]) rows.sort((a, b) => b[sort[src]] - a[sort[src]]);
+    return `<div><h4 style="margin:4px 0 6px">test runs scored from ${X_SRC[src]} labels</h4><table class="xt" data-src="${src}"><tr><th>text model</th>` +
+      cols.map(c => `<th data-c="${c}">${head[c] || c}${sort[src] === c ? " ▼" : ""}</th>`).join("") + `</tr>` +
+      rows.map(r => `<tr><td>${r.name}</td>` + cols.map(c => c === "tau" ? `<td class="dim">${r.tau == null ? "–" : r.tau.toPrecision(3)}</td>`
+        : `<td>${r[c] == null ? "–" : r[c].toFixed(3)}${ref(r)?.[c] !== undefined ? ` <span class="dim">(${ref(r)[c].toFixed(2)})</span>` : ""}</td>`).join("") + `</tr>`).join("") +
+      `</table></div>`;
+  }).join("") + `<p class="dim" style="grid-column:1 / -1; margin:0">${foot}</p>`;
+  for (const th of $("x-table").querySelectorAll("th[data-c]"))
+    th.onclick = () => xTable(R, fn, {...sort, [th.closest("table").dataset.src]: th.dataset.c});
+}
+
+// ---------- wiring
+function init() {
+  for (const b of document.querySelectorAll("nav button")) b.onclick = () => setTab(b.dataset.tab);
+  $("pool").onchange = () => loadPool($("pool").value, S.run, S.tick, S.tab);
+  $("run").onchange = () => setRun($("run").value, 0);
+  $("slider").oninput = () => setTick(+$("slider").value);
+  $("prev").onclick = () => setTick(S.tick - 1); $("next").onclick = () => setTick(S.tick + 1);
+  $("play").onclick = () => { if (S.timer) { clearInterval(S.timer); S.timer = null; $("play").textContent = "play"; }
+                              else { S.timer = setInterval(() => setTick(S.tick + 1), 200); $("play").textContent = "pause"; } };
+  const wins = () => run().windows;
+  $("onset").onclick = () => { const w = wins().find(([a]) => a > S.tick) || wins()[0]; if (w) setTick(w[0]); };
+  $("offset").onclick = () => { const w = wins().find(([, b]) => b - 1 > S.tick) || wins()[0]; if (w) setTick(w[1] - 1); };
+  for (const id of ["show-gt", "show-owl", "show-scn", "show-unl"]) $(id).onchange = drawCanvas;
+  $("metric").onchange = drawScores; $("anom").onchange = drawScores; $("tsrc").onchange = drawScores;
+  $("x-fn").onchange = drawExperiment;
+  $("em-model").onchange = drawEmbMap; $("em-proj").onchange = drawEmbMap;
+  for (const cb of document.querySelectorAll("#em-show input")) cb.onchange = drawEmbMap; $("x-anom").onchange = () => S.exp && xTable(S.exp, $("x-fn").value);
+  for (const el of document.querySelectorAll("#x-srcs input, #x-q input, input[name=x-abl-src]")) el.onchange = drawExperiment;
+  document.addEventListener("keydown", ev => {
+    if (S.tab !== "images" || ["INPUT", "SELECT"].includes(ev.target.tagName) && ev.target.type !== "range") return;
+    if (ev.key === "ArrowRight") { setTick(S.tick + (ev.shiftKey ? 10 : 1)); ev.preventDefault(); }
+    if (ev.key === "ArrowLeft") { setTick(S.tick - (ev.shiftKey ? 10 : 1)); ev.preventDefault(); }
+  });
+  const [tab, pool, name, tick, emb] = location.hash.slice(1).split("/");
+  if (emb) S.emb = emb;
+  loadPool(pool || "withheld", name, +tick || 0, tab || "images");
+}
+init();
+</script>
+</body>
+</html>
